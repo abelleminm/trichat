@@ -81,18 +81,11 @@ static void app(void)
          }
 
          /* after connecting the client sends its name */
-         if(read_client(csock, buffer) == -1)
+         if(read_client(csock, buffer) == -1) // problem : return from the function can never be -1 => always 0 at best cf. read_client function
          {
             /* disconnected */
             continue;
          }
-
-         /* what is the new maximum fd ? */
-         max = csock > max ? csock : max;
-
-         FD_SET(csock, &rdfs);
-
-         Client c = { csock };
 
          /* we will use the names in only lowercase => when storing and when displaying */
          int nbchar = 0;
@@ -101,6 +94,24 @@ static void app(void)
             ++nbchar;
          }
 
+         /* we can't have twice the same person logged in => check if there is already a client with this name */
+         int exists = 0;
+         for(int i=0; i<actual; ++i) {
+            if(!strcmp(clients[i].name,buffer)) { // if the name of a client is equal to the one recieved (strcmp returns 0) then we want to disconnect the client
+               exists = 1;
+            } 
+         }
+         if(exists) { // if the name was found we just continue and send a message to the client saying he can't connect with this name
+            write_client(csock, "You can't connect with this username because it is already in use");
+            closesocket(csock);
+            continue;
+         } 
+         /* what is the new maximum fd ? */
+         max = csock > max ? csock : max;
+
+         FD_SET(csock, &rdfs);
+
+         Client c = { csock };
          strncpy(c.name, buffer, BUF_SIZE - 1);
          clients[actual] = c;
          actual++;
@@ -296,6 +307,8 @@ static void end_connection(int sock)
 
 static int read_client(SOCKET sock, char *buffer)
 {
+   /* we want to manipulate strings (with strcmp, strcat, ...) => null byte terminated */
+   /* but we recv into a buffer that is too big and recv doesn't add null byte at the end => our string is unusable² */
    int n = 0;
 
    if((n = recv(sock, buffer, BUF_SIZE - 1, 0)) < 0)
@@ -305,6 +318,7 @@ static int read_client(SOCKET sock, char *buffer)
       n = 0;
    }
 
+   /* ²which is why we need to manually add the null byte at the end : n is the return value of recv = number of bytes read */
    buffer[n] = 0;
 
    return n;

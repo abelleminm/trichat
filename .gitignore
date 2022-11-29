@@ -50,3 +50,8 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Specific files to exclude
+Client/client
+Serveur/clients
+Serveur/server
