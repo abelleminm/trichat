@@ -52,6 +52,6 @@ Mkfile.old
 dkms.conf
 
 # Specific files to exclude
-Client/client
+Client/connect
 Server/clients
 Server/server
