@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "server.h"
 #include "client.h"
@@ -92,9 +93,62 @@ static void app(void)
          FD_SET(csock, &rdfs);
 
          Client c = { csock };
+
+         /* we will use the names in only lowercase => when storing and when displaying */
+         int nbchar = 0;
+         while(buffer[nbchar] != '\0') {
+            buffer[nbchar] = tolower(buffer[nbchar]);
+            ++nbchar;
+         }
+
          strncpy(c.name, buffer, BUF_SIZE - 1);
          clients[actual] = c;
          actual++;
+
+         /* we write the name of the client in the clients file if it is not present (new connection) */
+         /* first we read the file and search if the name provided already exists */
+         FILE* fptr;
+         if((fptr = fopen("clients", "r")) == NULL) {
+            perror("Error : Error opening file \'clients\'\n");
+            exit(EXIT_FAILURE);
+         }
+         /* go to the start of the file just to be sure */
+         fseek(fptr, 0, SEEK_SET);
+
+         char* line = NULL;
+         size_t len = 0;
+         ssize_t nread;
+         int found = 0;
+         /* we read each line */
+         while((nread = getline(&line, &len, fptr)) != -1) {
+            /* we get rid of the \n because getline keeps it */
+            char* c = strchr(line, '\n');
+            if(c){
+               *c = '\0';
+            }
+
+            /* we compare with our name buffer */
+            if(strcmp(buffer, line) == 0) {
+               found = 1;
+            }
+         }
+         /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+         free(line);
+         /* don't forget to close the file */
+         fclose(fptr);
+
+         /* if the name doesn't exist then we append it to the file */
+         if(!found) {
+            FILE* fptr;
+            if((fptr = fopen("clients", "a")) == NULL) {
+               perror("Error : Error opening file \'clients\'\n");
+               exit(EXIT_FAILURE);
+            }
+            fwrite(buffer, nbchar, 1, fptr);
+            fputc('\n', fptr);
+            fclose(fptr);
+         }
+         
       }
       else
       {
