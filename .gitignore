@@ -53,5 +53,5 @@ dkms.conf
 
 # Specific files to exclude
 Client/client
-Serveur/clients
-Serveur/server
+Server/clients
+Server/server
