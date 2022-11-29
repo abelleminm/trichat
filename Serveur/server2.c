@@ -113,11 +113,35 @@ static void app(void)
                   remove_client(clients, i, &actual);
                   strncpy(buffer, client.name, BUF_SIZE - 1);
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
-                  send_message_to_all_clients(clients, client, actual, buffer, 1);
+                  Client destinataire = clients[0];
+                  send_message_to_one_client(destinataire, client, actual, buffer, 1);
+                  //send_message_to_all_clients(clients, client, actual, buffer, 1);
                }
                else
                {
-                  send_message_to_all_clients(clients, client, actual, buffer, 0);
+                  // if the client sends "@name" then send the message to the client named "name"
+                  if(buffer[0] == '@')
+                  {
+                     char *name = buffer + 1;
+                     char *message = strchr(buffer, ' ');
+                     if(message == NULL)
+                     {
+                        continue;
+                     }
+                     *message = 0;
+                     message++;
+                     Client destinataire = get_client_by_name(clients, name, actual);
+                     if(destinataire.sock != -1)
+                     {
+                        send_message_to_one_client(destinataire, client, actual, message, 0);
+                     }
+                  }
+                  else
+                  {
+                     send_message_to_all_clients(clients, client, actual, buffer, 0);
+                  }
+                  // send_message_to_one_client(clients, client, actual, buffer, 1);
+                  //send_message_to_all_clients(clients, client, actual, buffer, 0);
                }
                break;
             }
@@ -159,11 +183,25 @@ static void send_message_to_all_clients(Client *clients, Client sender, int actu
          if(from_server == 0)
          {
             strncpy(message, sender.name, BUF_SIZE - 1);
-            strncat(message, " : ", sizeof message - strlen(message) - 1);
+            strncat(message, "(to everyone) : ", sizeof message - strlen(message) - 1);
          }
          strncat(message, buffer, sizeof message - strlen(message) - 1);
          write_client(clients[i].sock, message);
       }
+   }
+}
+
+static void send_message_to_one_client(Client destinataire, Client sender, int actual, const char *buffer, char from_server)
+{
+   int i = 0;
+   char message[BUF_SIZE];
+   message[0] = 0;
+   if(sender.sock != destinataire.sock)
+   {
+      strncpy(message, sender.name, BUF_SIZE - 1);
+      strncat(message, " : ", sizeof message - strlen(message) - 1);
+      strncat(message, buffer, sizeof message - strlen(message) - 1);
+      write_client(destinataire.sock, message);
    }
 }
 
@@ -225,6 +263,21 @@ static void write_client(SOCKET sock, const char *buffer)
       perror("send()");
       exit(errno);
    }
+}
+
+//get client by name
+static Client get_client_by_name(Client *clients, const char *name, int actual)
+{
+   int i = 0;
+   for(i = 0; i < actual; i++)
+   {
+      if(strcmp(clients[i].name, name) == 0)
+      {
+         return clients[i];
+      }
+   }
+   Client client = { -1 };
+   return client;
 }
 
 int main(int argc, char **argv)
