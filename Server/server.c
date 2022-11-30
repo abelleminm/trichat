@@ -215,7 +215,7 @@ static void app(void)
                         /* we open the file in read only => if it doesn't exist, it will return NULL */
                         if((fptr = fopen(group, "r")) != NULL) { 
                            perror("Error : File doesn\'t exist\n");
-                           write_client(client.sock, "This conversation already exists");
+                           write_client(client.sock, "This conversation already exist");
                            /* don't forget that the file was opened if we get in the if so we need to close it */
                            fclose(fptr);
                            continue;
@@ -246,7 +246,7 @@ static void app(void)
                         /* we open the file in read only => if it doesn't exist, it will return NULL */
                         if((fptr = fopen(group, "r")) == NULL) { 
                            perror("Error : File doesn\'t exist\n");
-                           write_client(client.sock, "This conversation doesn\'t exists");
+                           write_client(client.sock, "This conversation doesn\'t exist");
                            continue;
                         }
                         /* we will reopen the file in write mode so we need to close it */
@@ -273,6 +273,66 @@ static void app(void)
                      {
                         write_client(client.sock, "Error : unknown command");
                      }
+                  }
+                  else if(buffer[0] == '#') // "#group message" will send the message "message" to group named "group"
+                  {
+                     char *group = buffer + 1;
+                     char *message = strchr(buffer, ' ');
+                     if(group == NULL)
+                     {
+                        continue;
+                     }
+                     // we split the buffer in two by putting a null byte to terminate the group buffer in place of the ' ' at the begining of the message
+                     *message = 0; 
+                     message++;
+
+                     /* we first need to check if the client belongs to the group */
+                     /* first we read the file and search if the name exists */
+                     FILE* fptr;
+                     /* we open the file in read only => tests if the group exists aswell */
+                     if((fptr = fopen(group, "r")) == NULL) { 
+                        perror("Error : Group doesn\'t exist\n");
+                        write_client(client.sock, "This group doesn\'t exist, please create it first");
+                        continue;
+                     }
+                     /* go to the start of the file just to be sure */
+                     fseek(fptr, 0, SEEK_SET);
+
+                     char* line = NULL;
+                     size_t len = 0;
+                     ssize_t nread;
+                     int found = 0;
+                     /* we read each line */
+                     while((nread = getline(&line, &len, fptr)) != -1) {
+                        /* we get rid of the \n because getline keeps it */
+                        char* c = strchr(line, '\n');
+                        if(c){
+                           *c = '\0';
+                        }
+
+                        /* we compare with our name */
+                        if(strcmp(client.name, line) == 0) {
+                           found = 1;
+                        }
+                     }
+                     /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+                     free(line);
+
+                     /* if the name doesn't exist then the client can't talk to this group */
+                     if(!found) {
+                        write_client(client.sock, "You do not belong to this group, please join it first");
+                        /* don't forget to close the file */
+                        fclose(fptr);
+                        continue;
+                     }
+
+                     /* if the name exists then the client belongs to the group and we want to send the message to the whole group */
+                     /* close the file and call a function that will do the enumeration */
+                     fclose(fptr);
+                     send_message_to_group(clients, client, actual, group, message, 0);
+
+                     /* don't forget to close the file */
+                     fclose(fptr);
                   }
                   else
                   {
@@ -307,6 +367,49 @@ static void remove_client(Client *clients, int to_remove, int *actual)
    /* number client - 1 */
    (*actual)--;
 }
+
+send_message_to_group(Client* clients, Client sender, int nbClients, const char* groupname, const char* message, char from_server)
+{
+   /* 
+   we want to :
+      1) read the file that contains the names of the participants *THAT ARE CONNECTED*
+      2) get their corresponding sockets
+      3) send the message
+   */
+   SOCKET socks[100]; // we consider that we can't have more than 100 clients connected at the same time in the group => TODO : make sure it is impossible
+
+   FILE* fptr;
+   /* we open the file in read only => tests if the group exists aswell (which it should) */
+   if((fptr = fopen(groupname, "r")) == NULL) { 
+      perror("Error : Group doesn\'t exist\n");
+      exit(EXIT_FAILURE);
+   }
+   /* go to the start of the file just to be sure */
+   fseek(fptr, 0, SEEK_SET);
+
+   char* line = NULL;
+   size_t len = 0;
+   ssize_t nread;
+   /* we read each line */
+   while((nread = getline(&line, &len, fptr)) != -1) {
+      /* we get rid of the \n because getline keeps it */
+      char* c = strchr(line, '\n');
+      if(c){
+         *c = '\0';
+      }
+
+      /* we compare with all of the connected clients names */
+      for(int i=0; i<actual; ++i)
+      {
+         if(strcmp(clients[i].name, line) == 0) {
+            
+         }
+      }
+   }
+   /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+   free(line);
+
+}  
 
 static void send_message_to_all_clients(Client *clients, Client sender, int actual, const char *buffer, char from_server)
 {
