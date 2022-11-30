@@ -119,7 +119,8 @@ static void app(void)
          /* we write the name of the client in the clients file if it is not present (new connection) */
          /* first we read the file and search if the name provided already exists */
          FILE* fptr;
-         if((fptr = fopen("clients", "r")) == NULL) {
+         /* we open the file in read and append => if it doesn't exist it is created */
+         if((fptr = fopen("clients", "a+")) == NULL) { 
             perror("Error : Error opening file \'clients\'\n");
             exit(EXIT_FAILURE);
          }
@@ -145,20 +146,15 @@ static void app(void)
          }
          /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
          free(line);
-         /* don't forget to close the file */
-         fclose(fptr);
 
          /* if the name doesn't exist then we append it to the file */
          if(!found) {
-            FILE* fptr;
-            if((fptr = fopen("clients", "a")) == NULL) {
-               perror("Error : Error opening file \'clients\'\n");
-               exit(EXIT_FAILURE);
-            }
             fwrite(buffer, nbchar, 1, fptr);
             fputc('\n', fptr);
-            fclose(fptr);
          }
+
+         /* don't forget to close the file */
+         fclose(fptr);
          
       }
       else
@@ -199,6 +195,83 @@ static void app(void)
                      if(destinataire.sock != -1)
                      {
                         send_message_to_one_client(destinataire, client, actual, message, 0);
+                     }
+                  }
+                  else if(buffer[0] == '!') // the user sends "!command" to execute command "command" => for groups
+                  {
+                     char *command = buffer + 1;
+                     char *group = strchr(buffer, ' ');
+                     if(command == NULL)
+                     {
+                        continue;
+                     }
+                     // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
+                     *group = 0; 
+                     group++;
+                     if(!strcmp(command, "create")) // user wants to create a group chat
+                     {
+                        /* first we need to check if the conversation doesn't already exist */
+                        FILE* fptr;
+                        /* we open the file in read only => if it doesn't exist, it will return NULL */
+                        if((fptr = fopen(group, "r")) != NULL) { 
+                           perror("Error : File doesn\'t exist\n");
+                           write_client(client.sock, "This conversation already exists");
+                           /* don't forget that the file was opened if we get in the if so we need to close it */
+                           fclose(fptr);
+                           continue;
+                        }
+                        /* we don't need to close the file because if we got past the if statement it means it doesn't exists and wasn't opened */
+
+                        /* we create a file dedicated to store all users that are part of the group */
+                        /* we open the file in write only => if it doesn't exist it is created */
+                        if((fptr = fopen(group, "w")) == NULL) { 
+                           perror("Error : File doesn\'t exist\n");
+                           write_client(client.sock, "Error : File doesn\'t exist");
+                           continue;
+                        }
+                        /* go to the start of the file just to be sure */
+                        fseek(fptr, 0, SEEK_SET);
+
+                        /* the only person in the group when it is created is the creator */
+                        fputs(client.name, fptr);
+                        fputc('\n', fptr);
+
+                        /* don't forget to close the file */
+                        fclose(fptr);
+                     }
+                     else if(!strcmp(command, "join")) // user wants to join a group chat
+                     {
+                        /* first we need to check if the conversation exists */
+                        FILE* fptr;
+                        /* we open the file in read only => if it doesn't exist, it will return NULL */
+                        if((fptr = fopen(group, "r")) == NULL) { 
+                           perror("Error : File doesn\'t exist\n");
+                           write_client(client.sock, "This conversation doesn\'t exists");
+                           continue;
+                        }
+                        /* we will reopen the file in write mode so we need to close it */
+                        fclose(fptr);
+
+                        /* want to add the name of the person who joins to the file */
+                        /* we open the file in read append => we know it exists but it will not work if it doesn't (just in case) */
+                        if((fptr = fopen(group, "a+")) == NULL) { 
+                           perror("Error : File doesn\'t exist\n");
+                           write_client(client.sock, "Error : File doesn\'t exist");
+                           continue;
+                        }
+                        /* go to the start of the file just to be sure */
+                        fseek(fptr, 0, SEEK_SET);
+
+                        /* add the name to the file */
+                        fputs(client.name, fptr);
+                        fputc('\n', fptr);
+
+                        /* don't forget to close the file */
+                        fclose(fptr);
+                     }
+                     else
+                     {
+                        write_client(client.sock, "Error : unknown command");
                      }
                   }
                   else
