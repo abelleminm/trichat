@@ -45,6 +45,7 @@ static void write_client(SOCKET sock, const char *buffer);
 static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
 static void send_message_to_one_client(Client destinataire, Client sender, int actual, const char *buffer, char from_server);
 static void send_message_to_group(Client* clients, Client sender, int nbClients, const char* groupname, const char* message, char from_server);
+static void add_to_group_history(const char* message, const char* groupname);
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
 static Client get_client_by_name(Client *clients, const char *name, int actual);

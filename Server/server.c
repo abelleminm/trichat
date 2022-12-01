@@ -238,6 +238,23 @@ static void app(void)
 
                         /* don't forget to close the file */
                         fclose(fptr);
+
+                        /* when the group is created, we have to create the file to store the message history => name = groupname_histo */
+                        /* first we build the filename */
+                        char filename[BUF_SIZE];
+                        filename[0] = 0;
+                        strncpy(filename, group, BUF_SIZE - 1);
+                        strncat(filename, "_histo", sizeof filename - strlen(filename) - 1);
+                        /* then we open it in read append mode to create the file */
+                        if((fptr = fopen(filename, "a+")) == NULL) { 
+                           perror("Error : Error opening the history file\n");
+                           continue;
+                        }
+                        /* we write the first "message" of the group which is the group creation */
+                        fputs(client.name, fptr);
+                        fputs(" created the group\n", fptr);
+                        /* don't forget to close the file */
+                        fclose(fptr);
                      }
                      else if(!strcmp(command, "join")) // user wants to join a group chat
                      {
@@ -270,7 +287,7 @@ static void app(void)
                         fclose(fptr);
 
                         /* send a message to all clients in the group to let them know someone joined */
-                        send_message_to_group(clients,client,actual,group," joined !",1);
+                        send_message_to_group(clients,client,actual,group,NULL,1);
                      }
                      else
                      {
@@ -339,7 +356,7 @@ static void app(void)
                      send_message_to_all_clients(clients, client, actual, buffer, 0);
                   }
                   // send_message_to_one_client(clients, client, actual, buffer, 1);
-                  //send_message_to_all_clients(clients, client, actual, buffer, 0);
+                  // send_message_to_all_clients(clients, client, actual, buffer, 0);
                }
                break;
             }
@@ -424,17 +441,43 @@ static void send_message_to_group(Client* clients, Client sender, int nbClients,
       /* manages the "join" message */
       if(from_server) {
          strncpy(buffer, sender.name, BUF_SIZE - 1);
+         strncat(buffer, " joined ", sizeof buffer - strlen(buffer) - 1);
+         strncat(buffer, groupname, sizeof buffer - strlen(buffer) - 1);
+         strncat(buffer, " !", sizeof buffer - strlen(buffer) - 1);
       } else { /* or if it is just a normal message */
          strncpy(buffer, "[", BUF_SIZE - 1);
          strncat(buffer, groupname, sizeof buffer - strlen(buffer) - 1);
          strncat(buffer, "] ", sizeof buffer - strlen(buffer) - 1);
          strncat(buffer, sender.name, sizeof buffer - strlen(buffer) - 1);
          strncat(buffer, " : ", sizeof buffer - strlen(buffer) - 1);
+         strncat(buffer, message, sizeof buffer - strlen(buffer) - 1);
       }
-      strncat(buffer, message, sizeof buffer - strlen(buffer) - 1);
       write_client(socks[i], buffer);
    }
-}  
+
+   /* lastly we need to add the message to the history of the group */
+   add_to_group_history(buffer, groupname);
+} 
+
+static void add_to_group_history(const char* message, const char* groupname)
+{
+   /* we first open the file in append mode => build the name */
+   char filename[BUF_SIZE];
+   filename[0] = 0;
+   strncpy(filename, groupname, BUF_SIZE - 1);
+   strncat(filename, "_histo", sizeof filename - strlen(filename) - 1);
+   FILE* fptr;
+   /* then we open it in append mode to add the message */
+   if((fptr = fopen(filename, "a")) == NULL) { 
+      perror("Error : Error opening the history file\n");
+      exit(EXIT_FAILURE);
+   }
+   /* we write the message into the file => TODO : add the timestamps */
+   fputs(message, fptr);
+   fputc('\n', fptr);
+   /* don't forget to close the file */
+   fclose(fptr);
+}
 
 static void send_message_to_all_clients(Client *clients, Client sender, int actual, const char *buffer, char from_server)
 {
