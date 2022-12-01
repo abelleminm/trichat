@@ -268,6 +268,9 @@ static void app(void)
 
                         /* don't forget to close the file */
                         fclose(fptr);
+
+                        /* send a message to all clients in the group to let them know someone joined */
+                        send_message_to_group(clients,client,actual,group," joined !",1);
                      }
                      else
                      {
@@ -330,9 +333,6 @@ static void app(void)
                      /* close the file and call a function that will do the enumeration */
                      fclose(fptr);
                      send_message_to_group(clients, client, actual, group, message, 0);
-
-                     /* don't forget to close the file */
-                     fclose(fptr);
                   }
                   else
                   {
@@ -368,7 +368,7 @@ static void remove_client(Client *clients, int to_remove, int *actual)
    (*actual)--;
 }
 
-send_message_to_group(Client* clients, Client sender, int nbClients, const char* groupname, const char* message, char from_server)
+static void send_message_to_group(Client* clients, Client sender, int nbClients, const char* groupname, const char* message, char from_server)
 {
    /* 
    we want to :
@@ -377,6 +377,7 @@ send_message_to_group(Client* clients, Client sender, int nbClients, const char*
       3) send the message
    */
    SOCKET socks[100]; // we consider that we can't have more than 100 clients connected at the same time in the group => TODO : make sure it is impossible
+   int countSocks = 0;
 
    FILE* fptr;
    /* we open the file in read only => tests if the group exists aswell (which it should) */
@@ -399,16 +400,40 @@ send_message_to_group(Client* clients, Client sender, int nbClients, const char*
       }
 
       /* we compare with all of the connected clients names */
-      for(int i=0; i<actual; ++i)
+      for(int i=0; i<nbClients; ++i)
       {
-         if(strcmp(clients[i].name, line) == 0) {
-            
+         /* if the name of the client corresponds we add his socket id to the list of recievers */
+         /* we test for the name of the sender because the sender doesn't send to himself */
+         if((strcmp(clients[i].name, line) == 0) && (strcmp(sender.name, line) != 0)) {
+            socks[countSocks] = clients[i].sock;
+            ++countSocks;
          }
       }
    }
    /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
    free(line);
+   /* don't forget to close the file now we have read it */
+   fclose(fptr);
 
+   /* now we have all the sockets corresponding to the clients in the group, we want to send the message to each one of them */
+   char buffer[BUF_SIZE];
+   buffer[0] = 0;
+   /* message sent is of the form "[groupname] sender_name : message"*/
+   for(int i=0; i<countSocks; ++i)
+   {
+      /* manages the "join" message */
+      if(from_server) {
+         strncpy(buffer, sender.name, BUF_SIZE - 1);
+      } else { /* or if it is just a normal message */
+         strncpy(buffer, "[", BUF_SIZE - 1);
+         strncat(buffer, groupname, sizeof buffer - strlen(buffer) - 1);
+         strncat(buffer, "] ", sizeof buffer - strlen(buffer) - 1);
+         strncat(buffer, sender.name, sizeof buffer - strlen(buffer) - 1);
+         strncat(buffer, " : ", sizeof buffer - strlen(buffer) - 1);
+      }
+      strncat(buffer, message, sizeof buffer - strlen(buffer) - 1);
+      write_client(socks[i], buffer);
+   }
 }  
 
 static void send_message_to_all_clients(Client *clients, Client sender, int actual, const char *buffer, char from_server)
