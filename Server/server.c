@@ -37,6 +37,9 @@ static void app(void)
    /* an array for all clients */
    Client clients[MAX_CLIENTS];
 
+   int nbrGroup = 0;
+   Group groups[MAX_GROUPS];
+
    fd_set rdfs;
 
    while(1)
@@ -197,7 +200,7 @@ static void app(void)
                         send_message_to_one_client(destinataire, client, actual, message, 0);
                      }
                   }
-                  else if(buffer[0] == '!') // the user sends "!command" to execute command "command" => for groups
+                  else if(buffer[0] == '!') // the user sends "!command" to execute command "command"
                   {
                      char *command = buffer + 1;
                      char *group = strchr(buffer, ' ');
@@ -205,11 +208,19 @@ static void app(void)
                      {
                         continue;
                      }
-                     // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
-                     *group = 0; 
-                     group++;
+                     if(group != NULL)
+                     {
+                        // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
+                        *group = 0; 
+                        group++;
+                     }
                      if(!strcmp(command, "create")) // user wants to create a group chat
                      {
+                        if(group == NULL)
+                        {
+                           write_client(client.sock, "Usage : !create [group name]");
+                           continue;
+                        }
                         /* first we need to check if the conversation doesn't already exist */
                         FILE* fptr;
                         /* we open the file in read only => if it doesn't exist, it will return NULL */
@@ -238,23 +249,13 @@ static void app(void)
 
                         /* don't forget to close the file */
                         fclose(fptr);
+                        
+                        Group g = { group };
+                        groups[nbrGroup] = g;
+                        nbrGroup++;
 
-                        /* when the group is created, we have to create the file to store the message history => name = groupname_histo */
-                        /* first we build the filename */
-                        char filename[BUF_SIZE];
-                        filename[0] = 0;
-                        strncpy(filename, group, BUF_SIZE - 1);
-                        strncat(filename, "_histo", sizeof filename - strlen(filename) - 1);
-                        /* then we open it in read append mode to create the file */
-                        if((fptr = fopen(filename, "a+")) == NULL) { 
-                           perror("Error : Error opening the history file\n");
-                           continue;
-                        }
-                        /* we write the first "message" of the group which is the group creation */
-                        fputs(client.name, fptr);
-                        fputs(" created the group\n", fptr);
-                        /* don't forget to close the file */
-                        fclose(fptr);
+                        add_client_group(client, groups, nbrGroup, group);
+                        
                      }
                      else if(!strcmp(command, "join")) // user wants to join a group chat
                      {
@@ -286,8 +287,21 @@ static void app(void)
                         /* don't forget to close the file */
                         fclose(fptr);
 
-                        /* send a message to all clients in the group to let them know someone joined */
-                        send_message_to_group(clients,client,actual,group,NULL,1);
+                        /* Add client to the group in struct */
+                        for(int i = 0 ; i < nbrGroup ; ++i)
+                        {
+                           if(!strcmp(groups[i].name, group))
+                           {
+                              if(actual == MAX_CLIENTS)
+                              {
+                                 write_client(client.sock, "Can't join the group : group is full");
+                                 break;
+                              }
+                              /* add the client and increment the size */
+                              groups[i].members[actual++] = client;
+                              break;
+                           }
+                        }
                      }
                      else
                      {
@@ -350,13 +364,16 @@ static void app(void)
                      /* close the file and call a function that will do the enumeration */
                      fclose(fptr);
                      send_message_to_group(clients, client, actual, group, message, 0);
+
+                     /* don't forget to close the file */
+                     fclose(fptr);
                   }
                   else
                   {
                      send_message_to_all_clients(clients, client, actual, buffer, 0);
                   }
                   // send_message_to_one_client(clients, client, actual, buffer, 1);
-                  // send_message_to_all_clients(clients, client, actual, buffer, 0);
+                  //send_message_to_all_clients(clients, client, actual, buffer, 0);
                }
                break;
             }
@@ -385,7 +402,7 @@ static void remove_client(Client *clients, int to_remove, int *actual)
    (*actual)--;
 }
 
-static void send_message_to_group(Client* clients, Client sender, int nbClients, const char* groupname, const char* message, char from_server)
+send_message_to_group(Client* clients, Client sender, int nbClients, const char* groupname, const char* message, char from_server)
 {
    /* 
    we want to :
@@ -394,7 +411,6 @@ static void send_message_to_group(Client* clients, Client sender, int nbClients,
       3) send the message
    */
    SOCKET socks[100]; // we consider that we can't have more than 100 clients connected at the same time in the group => TODO : make sure it is impossible
-   int countSocks = 0;
 
    FILE* fptr;
    /* we open the file in read only => tests if the group exists aswell (which it should) */
@@ -417,67 +433,17 @@ static void send_message_to_group(Client* clients, Client sender, int nbClients,
       }
 
       /* we compare with all of the connected clients names */
-      for(int i=0; i<nbClients; ++i)
+      for(int i=0; i<actual; ++i)
       {
-         /* if the name of the client corresponds we add his socket id to the list of recievers */
-         /* we test for the name of the sender because the sender doesn't send to himself */
-         if((strcmp(clients[i].name, line) == 0) && (strcmp(sender.name, line) != 0)) {
-            socks[countSocks] = clients[i].sock;
-            ++countSocks;
+         if(strcmp(clients[i].name, line) == 0) {
+            
          }
       }
    }
    /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
    free(line);
-   /* don't forget to close the file now we have read it */
-   fclose(fptr);
 
-   /* now we have all the sockets corresponding to the clients in the group, we want to send the message to each one of them */
-   char buffer[BUF_SIZE];
-   buffer[0] = 0;
-   /* message sent is of the form "[groupname] sender_name : message"*/
-   for(int i=0; i<countSocks; ++i)
-   {
-      /* manages the "join" message */
-      if(from_server) {
-         strncpy(buffer, sender.name, BUF_SIZE - 1);
-         strncat(buffer, " joined ", sizeof buffer - strlen(buffer) - 1);
-         strncat(buffer, groupname, sizeof buffer - strlen(buffer) - 1);
-         strncat(buffer, " !", sizeof buffer - strlen(buffer) - 1);
-      } else { /* or if it is just a normal message */
-         strncpy(buffer, "[", BUF_SIZE - 1);
-         strncat(buffer, groupname, sizeof buffer - strlen(buffer) - 1);
-         strncat(buffer, "] ", sizeof buffer - strlen(buffer) - 1);
-         strncat(buffer, sender.name, sizeof buffer - strlen(buffer) - 1);
-         strncat(buffer, " : ", sizeof buffer - strlen(buffer) - 1);
-         strncat(buffer, message, sizeof buffer - strlen(buffer) - 1);
-      }
-      write_client(socks[i], buffer);
-   }
-
-   /* lastly we need to add the message to the history of the group */
-   add_to_group_history(buffer, groupname);
-} 
-
-static void add_to_group_history(const char* message, const char* groupname)
-{
-   /* we first open the file in append mode => build the name */
-   char filename[BUF_SIZE];
-   filename[0] = 0;
-   strncpy(filename, groupname, BUF_SIZE - 1);
-   strncat(filename, "_histo", sizeof filename - strlen(filename) - 1);
-   FILE* fptr;
-   /* then we open it in append mode to add the message */
-   if((fptr = fopen(filename, "a")) == NULL) { 
-      perror("Error : Error opening the history file\n");
-      exit(EXIT_FAILURE);
-   }
-   /* we write the message into the file => TODO : add the timestamps */
-   fputs(message, fptr);
-   fputc('\n', fptr);
-   /* don't forget to close the file */
-   fclose(fptr);
-}
+}  
 
 static void send_message_to_all_clients(Client *clients, Client sender, int actual, const char *buffer, char from_server)
 {
@@ -591,6 +557,58 @@ static Client get_client_by_name(Client *clients, const char *name, int actual)
    Client client = { -1 };
    return client;
 }
+
+//add client in a group
+static void add_client_group(Client client, Group *groups, int nbrGroup, const char *group)
+{
+   /* first we need to check if the conversation exists */
+   FILE* fptr;
+   /* we open the file in read only => if it doesn't exist, it will return NULL */
+   if((fptr = fopen(group, "r")) == NULL) { 
+      perror("Error : File doesn\'t exist\n");
+      write_client(client.sock, "This conversation doesn\'t exist");
+      return;
+   }
+   /* we will reopen the file in write mode so we need to close it */
+   fclose(fptr);
+
+   /* want to add the name of the person who joins to the file */
+   /* we open the file in read append => we know it exists but it will not work if it doesn't (just in case) */
+   if((fptr = fopen(group, "a+")) == NULL) { 
+      perror("Error : File doesn\'t exist\n");
+      write_client(client.sock, "Error : File doesn\'t exist");
+      return;
+   }
+   /* go to the start of the file just to be sure */
+   fseek(fptr, 0, SEEK_SET);
+
+   /* add the name to the file */
+   fputs(client.name, fptr);
+   fputc('\n', fptr);
+
+   /* don't forget to close the file */
+   fclose(fptr);
+
+   /* Add client to the group in struct */
+   for(int i = 0 ; i < nbrGroup ; ++i)
+   {
+      if(!strcmp(groups[i].name, group))
+      {
+         if(groups[i].actual == MAX_CLIENTS)
+         {
+            write_client(client.sock, "Can't join the group : group is full");
+            return;
+         }
+         /* add the client and increment the size */
+         groups[i].members[groups[i].actual++] = client;
+         break;
+      }
+   }
+   return;
+}
+
+
+
 
 int main(int argc, char **argv)
 {
