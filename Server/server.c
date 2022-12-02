@@ -38,6 +38,9 @@ static void app(void)
    /* an array for all clients */
    Client clients[MAX_CLIENTS];
 
+   int nbrGroup = 0;
+   Group groups[MAX_GROUPS];
+
    fd_set rdfs;
 
    while(1)
@@ -226,23 +229,6 @@ static void app(void)
                         }
                         /* we don't need to close the file because if we got past the if statement it means it doesn't exists and wasn't opened */
 
-                        /* we create a file dedicated to store all users that are part of the group */
-                        /* we open the file in write only => if it doesn't exist it is created */
-                        if((fptr = fopen(group, "w")) == NULL) { 
-                           perror("Error : File doesn\'t exist\n");
-                           write_client(client.sock, "Error : File doesn\'t exist");
-                           continue;
-                        }
-                        /* go to the start of the file just to be sure */
-                        fseek(fptr, 0, SEEK_SET);
-
-                        /* the only person in the group when it is created is the creator */
-                        fputs(client.name, fptr);
-                        fputc('\n', fptr);
-
-                        /* don't forget to close the file */
-                        fclose(fptr);
-
                         /* when the group is created, we have to create the file to store the message history => name = groupname_histo */
                         /* first we build the filename */
                         char filename[BUF_SIZE];
@@ -259,36 +245,16 @@ static void app(void)
                         fputs(" created the group\n", fptr);
                         /* don't forget to close the file */
                         fclose(fptr);
+
+                        Group g = {};
+                        strncpy(g.name, group, BUF_SIZE-1);
+                        groups[nbrGroup++] = g;
+
+                        add_client_group(client, groups, nbrGroup, group);
                      }
                      else if(!strcmp(command, "join")) // user wants to join a group chat
                      {
-                        /* first we need to check if the conversation exists */
-                        FILE* fptr;
-                        /* we open the file in read only => if it doesn't exist, it will return NULL */
-                        if((fptr = fopen(group, "r")) == NULL) { 
-                           perror("Error : File doesn\'t exist\n");
-                           write_client(client.sock, "This conversation doesn\'t exist");
-                           continue;
-                        }
-                        /* we will reopen the file in write mode so we need to close it */
-                        fclose(fptr);
-
-                        /* want to add the name of the person who joins to the file */
-                        /* we open the file in read append => we know it exists but it will not work if it doesn't (just in case) */
-                        if((fptr = fopen(group, "a+")) == NULL) { 
-                           perror("Error : File doesn\'t exist\n");
-                           write_client(client.sock, "Error : File doesn\'t exist");
-                           continue;
-                        }
-                        /* go to the start of the file just to be sure */
-                        fseek(fptr, 0, SEEK_SET);
-
-                        /* add the name to the file */
-                        fputs(client.name, fptr);
-                        fputc('\n', fptr);
-
-                        /* don't forget to close the file */
-                        fclose(fptr);
+                        add_client_group(client, groups, nbrGroup, group);
 
                         /* send a message to all clients in the group to let them know someone joined */
                         send_message_to_group(clients,client,actual,group,NULL,1);
@@ -404,7 +370,7 @@ static void send_message_to_group(Client* clients, Client sender, int nbClients,
    /* we open the file in read only => tests if the group exists aswell (which it should) */
    if((fptr = fopen(groupname, "r")) == NULL) { 
       perror("Error : Group doesn\'t exist\n");
-      exit(EXIT_FAILURE);
+      return;
    }
    /* go to the start of the file just to be sure */
    fseek(fptr, 0, SEEK_SET);
@@ -474,7 +440,7 @@ static void add_to_group_history(const char* message, const char* groupname)
    /* then we open it in append mode to add the message */
    if((fptr = fopen(filename, "a")) == NULL) { 
       perror("Error : Error opening the history file\n");
-      exit(EXIT_FAILURE);
+      return;
    }
    /* we write the message into the file + we add the timestamp to it => format of message in history : (timestamp) message\n */
    time_t timestamp = time(NULL);
@@ -516,7 +482,6 @@ static void send_message_to_all_clients(Client *clients, Client sender, int actu
 
 static void send_message_to_one_client(Client destinataire, Client sender, int actual, const char *buffer, char from_server)
 {
-   int i = 0;
    char message[BUF_SIZE];
    message[0] = 0;
    if(sender.sock != destinataire.sock)
@@ -616,6 +581,62 @@ static Client get_client_by_name(Client *clients, const char *name, int actual)
    }
    Client client = { -1 };
    return client;
+}
+
+//add client in a group
+static void add_client_group(Client client, Group *groups, int nbrGroup, const char *group)
+{
+   int error = 1;
+   /* Add client to the group in struct */
+   for(int i = 0 ; i < nbrGroup ; ++i)
+   {
+      if(!strcmp(groups[i].name, group))
+      {
+         if(groups[i].actual == MAX_CLIENTS)
+         {
+            write_client(client.sock, "Can't join the group : group is full");
+            return;
+         }
+         for(int j = 0 ; j < groups[i].actual ; ++j)
+         {
+            if(!strcmp(client.name, groups[i].members[j]->name))
+            {
+               write_client(client.sock, "You're already in the group!");
+               return;
+            }
+         }
+         /* add the client and increment the size */
+         groups[i].members[groups[i].actual++] = &client;
+         error = 0;
+         break;
+      }
+   }
+   if(error)
+   {
+      write_client(client.sock, "This group doesn't exist");
+      return;
+   }
+
+   FILE* fptr;
+
+   /* want to add the name of the person who joins to the file */
+   /* we open the file in read append => we know it exists but it will not work if it doesn't (just in case) */
+   if((fptr = fopen(group, "a+")) == NULL) { 
+      perror("Error : File doesn\'t exist\n");
+      write_client(client.sock, "Error : File doesn\'t exist");
+      return;
+   }
+   /* go to the start of the file just to be sure */
+   fseek(fptr, 0, SEEK_SET);
+
+   /* add the name to the file */
+   fputs(client.name, fptr);
+   fputc('\n', fptr);
+
+   /* don't forget to close the file */
+   fclose(fptr);
+
+   return;
 }
 
 int main(int argc, char **argv)
