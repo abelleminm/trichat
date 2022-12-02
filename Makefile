@@ -13,6 +13,7 @@ client.o : ./Client/client.c
 	gcc -c -Wall ./Client/client.c
 
 clean :
-	rm -f *.o
+	rm -f server.o
+	rm -f client.o
 	rm -f connect
 	rm -f serv
