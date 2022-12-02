@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 
 #include "server.h"
 #include "client.h"
@@ -472,7 +473,17 @@ static void add_to_group_history(const char* message, const char* groupname)
       perror("Error : Error opening the history file\n");
       exit(EXIT_FAILURE);
    }
-   /* we write the message into the file => TODO : add the timestamps */
+   /* we write the message into the file + we add the timestamp to it => format of message in history : (timestamp) message\n */
+   time_t timestamp = time(NULL);
+   char* time = ctime(&timestamp);
+   fputc('(', fptr);
+   /* the string returned by ctime is terminated by a \n */
+   char* c = strchr(time, '\n');
+   if(c){
+      *c = '\0';
+   }
+   fputs(time, fptr);
+   fputs(") ", fptr);
    fputs(message, fptr);
    fputc('\n', fptr);
    /* don't forget to close the file */
@@ -554,16 +565,28 @@ static int read_client(SOCKET sock, char *buffer)
    /* we want to manipulate strings (with strcmp, strcat, ...) => null byte terminated */
    /* but we recv into a buffer that is too big and recv doesn't add null byte at the end => our string is unusable² */
    int n = 0;
+   int error = 0;
 
    if((n = recv(sock, buffer, BUF_SIZE - 1, 0)) < 0)
    {
       perror("recv()");
       /* if recv error we disonnect the client */
       n = 0;
+      error = 1;
    }
 
    /* ²which is why we need to manually add the null byte at the end : n is the return value of recv = number of bytes read */
    buffer[n] = 0;
+
+   /* 
+   cf call to read client in app where error was spotted : error control is made using the return of this function => if return = -1 then it's an error
+   it was done thinking that if recv gets an error then n will be -1
+   BUT => we modify the return of the recv function to be able to do buffer[n] even if recv gets and error (=> we can't write buffer[-1])
+   therefore error handling won't happen in any case => that's why we need to add a boolean "error" that will make the function return -1 when recv gets an error
+   */
+   if(error) {
+      return -1;
+   }
 
    return n;
 }
