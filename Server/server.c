@@ -151,6 +151,9 @@ static void app(void)
          if(!found) {
             fwrite(buffer, nbchar, 1, fptr);
             fputc('\n', fptr);
+            write_client(csock, "Welcome to Trichat ! You can now chat with your friends !");
+         }else{
+            write_client(csock, "Welcome back to Trichat ! You can now chat with your friends !");
          }
 
          /* don't forget to close the file */
@@ -492,7 +495,7 @@ static void send_message_to_all_clients(Client *clients, Client sender, int actu
          if(from_server == 0)
          {
             strncpy(message, sender.name, BUF_SIZE - 1);
-            strncat(message, "(to everyone) : ", sizeof message - strlen(message) - 1);
+            strncat(message, " (to everyone) : ", sizeof message - strlen(message) - 1);
          }
          strncat(message, buffer, sizeof message - strlen(message) - 1);
          write_client(clients[i].sock, message);
@@ -508,7 +511,7 @@ static void send_message_to_one_client(Client destinataire, Client sender, int a
    if(sender.sock != destinataire.sock)
    {
       strncpy(message, sender.name, BUF_SIZE - 1);
-      strncat(message, " : ", sizeof message - strlen(message) - 1);
+      strncat(message, " (to you) : ", sizeof message - strlen(message) - 1);
       strncat(message, buffer, sizeof message - strlen(message) - 1);
       write_client(destinataire.sock, message);
    }
