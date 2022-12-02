@@ -31,6 +31,7 @@ static void end(void)
 static void app(void)
 {
    SOCKET sock = init_connection();
+   printf ("Server Trichat started\n");  
    char buffer[BUF_SIZE];
    /* the index for the array */
    int actual = 0;
@@ -105,6 +106,7 @@ static void app(void)
          if(exists) { // if the name was found we just continue and send a message to the client saying he can't connect with this name
             write_client(csock, "You can't connect with this username because it is already in use");
             closesocket(csock);
+            printf ("User failed trying to connect as client : %s, who is already connected \n", buffer);
             continue;
          } 
          /* what is the new maximum fd ? */
@@ -153,8 +155,10 @@ static void app(void)
             fwrite(buffer, nbchar, 1, fptr);
             fputc('\n', fptr);
             write_client(csock, "Welcome to Trichat ! You can now chat with your friends !");
+            printf ("User connected as new client : %s\n", c.name);
          }else{
             write_client(csock, "Welcome back to Trichat ! You can now chat with your friends !");
+            printf ("User connected as known client : %s\n", c.name);
          }
 
          /* don't forget to close the file */
@@ -180,6 +184,7 @@ static void app(void)
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
                   Client destinataire = clients[0];
                   send_message_to_one_client(destinataire, client, actual, buffer, 1);
+                  printf ("Client : %s sent a message to client : %s.\n", client.name, destinataire.name);
                   //send_message_to_all_clients(clients, client, actual, buffer, 1);
                }
                else
@@ -199,6 +204,7 @@ static void app(void)
                      if(destinataire.sock != -1)
                      {
                         send_message_to_one_client(destinataire, client, actual, message, 0);
+                        printf ("Client : %s sent a message to client : %s.\n", client.name, destinataire.name);
                      }
                   }
                   else if(buffer[0] == '!') // the user sends "!command" to execute command "command" => for groups
@@ -219,7 +225,8 @@ static void app(void)
                         /* we open the file in read only => if it doesn't exist, it will return NULL */
                         if((fptr = fopen(group, "r")) != NULL) { 
                            perror("Error : File doesn\'t exist\n");
-                           write_client(client.sock, "This conversation already exist");
+                           write_client(client.sock, "This conversation already exists");
+                           printf ("User : %s failed trying to create existing group : %s .\n", client.name, group);
                            /* don't forget that the file was opened if we get in the if so we need to close it */
                            fclose(fptr);
                            continue;
@@ -230,7 +237,7 @@ static void app(void)
                         /* we open the file in write only => if it doesn't exist it is created */
                         if((fptr = fopen(group, "w")) == NULL) { 
                            perror("Error : File doesn\'t exist\n");
-                           write_client(client.sock, "Error : File doesn\'t exist");
+                           // write_client(client.sock, "Error : File doesn\'t exist");
                            continue;
                         }
                         /* go to the start of the file just to be sure */
@@ -259,6 +266,7 @@ static void app(void)
                         fputs(" created the group\n", fptr);
                         /* don't forget to close the file */
                         fclose(fptr);
+                        printf ("User : %s created and joined group : %s .\n", client.name, group);
                      }
                      else if(!strcmp(command, "join")) // user wants to join a group chat
                      {
@@ -266,8 +274,9 @@ static void app(void)
                         FILE* fptr;
                         /* we open the file in read only => if it doesn't exist, it will return NULL */
                         if((fptr = fopen(group, "r")) == NULL) { 
-                           perror("Error : File doesn\'t exist\n");
-                           write_client(client.sock, "This conversation doesn\'t exist");
+                           perror("Error : File doesn\'t exist.\n");
+                           write_client(client.sock, "This conversation doesn\'t exist.");
+                           printf ("User : %s failed trying to join unexisting group.\n", client.name);
                            continue;
                         }
                         /* we will reopen the file in write mode so we need to close it */
@@ -276,8 +285,8 @@ static void app(void)
                         /* want to add the name of the person who joins to the file */
                         /* we open the file in read append => we know it exists but it will not work if it doesn't (just in case) */
                         if((fptr = fopen(group, "a+")) == NULL) { 
-                           perror("Error : File doesn\'t exist\n");
-                           write_client(client.sock, "Error : File doesn\'t exist");
+                           perror("Error : File doesn\'t exist.\n");
+                           write_client(client.sock, "Error : File doesn\'t exist.");
                            continue;
                         }
                         /* go to the start of the file just to be sure */
@@ -295,7 +304,7 @@ static void app(void)
                      }
                      else
                      {
-                        write_client(client.sock, "Error : unknown command");
+                        write_client(client.sock, "Error : unknown command.");
                      }
                   }
                   else if(buffer[0] == '#') // "#group message" will send the message "message" to group named "group"
@@ -316,7 +325,8 @@ static void app(void)
                      /* we open the file in read only => tests if the group exists aswell */
                      if((fptr = fopen(group, "r")) == NULL) { 
                         perror("Error : Group doesn\'t exist\n");
-                        write_client(client.sock, "This group doesn\'t exist, please create it first");
+                        write_client(client.sock, "This group doesn\'t exist, please create it first.");
+                        printf ("User : %s failed trying to send message to unexisting group.\n", client.name);
                         continue;
                      }
                      /* go to the start of the file just to be sure */
@@ -344,7 +354,8 @@ static void app(void)
 
                      /* if the name doesn't exist then the client can't talk to this group */
                      if(!found) {
-                        write_client(client.sock, "You do not belong to this group, please join it first");
+                        write_client(client.sock, "You do not belong to this group, please join it first.");
+                        printf ("User : %s failed trying to send message to a group he doen't belong to.\n", client.name);
                         /* don't forget to close the file */
                         fclose(fptr);
                         continue;
@@ -354,10 +365,12 @@ static void app(void)
                      /* close the file and call a function that will do the enumeration */
                      fclose(fptr);
                      send_message_to_group(clients, client, actual, group, message, 0);
+                     printf ("User : %s sent a message to group : %s\n", client.name, group);
                   }
                   else
                   {
                      send_message_to_all_clients(clients, client, actual, buffer, 0);
+                     printf("User : %s sent to message to everyone.", client.name);
                   }
                   // send_message_to_one_client(clients, client, actual, buffer, 1);
                   // send_message_to_all_clients(clients, client, actual, buffer, 0);
