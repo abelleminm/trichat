@@ -18,3 +18,4 @@ Ecrire directement depuis son terminal envoie un message à toutes les personnes
 
 ## Commandes pour le serveur (précédé de "!")
 !create nomDuGroupe : permet de créer un groupe au nom de nomDuGroupe
+!join nomDuGroupe : permet à un utilisateur de rejoindre le groupe "nomDuGroupe"
