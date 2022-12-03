@@ -428,21 +428,122 @@ static void app(void)
                         }
 
                         /* we add the client to the group */
-                        add_client_group(&clients[index], groups, nbrGroup, group);
+                        int err = add_client_group(&clients[index], groups, nbrGroup, group);
 
-                        int gpIndex;
-                        for(int i=0; i<nbrGroup; ++i)
+                        if(!err) // we send the messages only if the group was successfully joined
                         {
-                           if(!strcmp(groups[i]->name, group))
+                           int gpIndex;
+                           for(int i=0; i<nbrGroup; ++i)
                            {
-                              gpIndex = i;
+                              if(!strcmp(groups[i]->name, group))
+                              {
+                                 gpIndex = i;
+                                 break;
+                              }
+                           }
+                           /* send a message to all clients in the group to let them know someone joined */
+                           send_message_to_group(groups[gpIndex],client,NULL,1);
+
+                           write_client(client.sock, "Group joined");
+                        }
+                     }
+                     else if(!strcmp(command, "histo"))
+                     {
+                        /* the user want's to display the message history of the group => by default we give the 10 last messages */
+                        /*
+                        first we check that the user belong to the group and that the group exists
+                        we want to open the file corresponding to the group chat's history
+                        then we count the number of lines (messages) and subtract 10 to get the number of lines to skip
+                        then we read the file, skip the x first lines and just print the rest
+                        */
+
+                        /* does the user belong to he group ? and does the group exist ? */
+                        int found = 0;
+                        int exists = 0;
+                        for(int i = 0; i<nbrGroup; ++i)
+                        {
+                           if(!strcmp(groups[i]->name, group)) // we found the group
+                           {
+                              for(int j = 0; j<groups[i]->actual; ++j)
+                              {
+                                 if(!strcmp(groups[i]->members[j]->name, client.name)) // if the user's name is in the list of members
+                                 {
+                                    found = 1;
+                                    break;
+                                 }
+                              }
+                              exists = 1;
                               break;
                            }
                         }
-                        /* send a message to all clients in the group to let them know someone joined */
-                        send_message_to_group(groups[gpIndex],client,NULL,1);
 
-                        write_client(client.sock, "Group joined");
+                        /* error handling : group doesn't exist or user not part of it */
+                        if(!exists)
+                        {
+                           write_client(client.sock, "This group doesn\'t exist");
+                           continue;
+                        }
+                        if(!found)
+                        {
+                           write_client(client.sock, "You can't view the history unless you are part of the group");
+                           continue;
+                        }
+
+                        FILE* fptr;
+                        /* we open the file in read only : if the file doesn't exist then the group doesn't exist */
+                        char filename[BUF_SIZE];
+                        filename[0] = 0;
+                        strncpy(filename, group, BUF_SIZE - 1);
+                        strncat(filename, "_histo", sizeof filename - strlen(filename) - 1);
+                        if((fptr = fopen(filename, "r")) == NULL) { 
+                           perror("Error : Group doesn\'t exist\n");
+                           write_client(client.sock, "This group doesn\'t exist");
+                           continue;
+                           /* no need to close the file because if we get to this point it means it wasn't opened */
+                        }
+                        /* go to the start of the file just to be sure */
+                        fseek(fptr, 0, SEEK_SET);
+
+                        char* line = NULL;
+                        size_t len = 0;
+                        ssize_t nread;
+                        int countLine = 0;
+                        /* we count the number of lines */
+                        while((nread = getline(&line, &len, fptr)) != -1) {
+                           ++countLine;
+                        }
+                        /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+                        free(line);
+                        
+                        /* we subtract 10 from the total, if there are less than 10 messages we will get a negative number => just change it to zero */
+                        countLine -= 10;
+                        if(countLine < 0)
+                        {
+                           countLine = 0;
+                        }
+
+                        /* we then go back to the begining of the file */
+                        fseek(fptr, 0, SEEK_SET);
+                        /* and we read and send the 10 last lines */
+                        write_client(client.sock, "======= Message History ======");
+                        line = NULL;
+                        len = 0;
+                        int counter = 0;
+                        /* we read all the lines */
+                        while((nread = getline(&line, &len, fptr)) != -1) {
+                           if(counter >= countLine) // we got to the last 10 lines
+                           {
+                              /* we send the line to the client */
+                              write_client(client.sock, line);
+                           }
+                           ++counter;
+                        }
+                        free(line);
+
+                        write_client(client.sock, "==============================");
+
+                        /* don't forget to close the file */
+                        fclose(fptr);
                      }
                      else
                      {
@@ -719,7 +820,8 @@ static Client get_client_by_name(Client *clients, const char *name, int actual)
 }
 
 //add client in a group
-static void add_client_group(Client* client, Group** groups, int nbrGroup, const char *group)
+/* function returns 0 for success, 1 if the person couldn't join the group for any reason */
+static int add_client_group(Client* client, Group** groups, int nbrGroup, const char *group)
 {
    int error = 1;
    /* Add client to the group in struct */
@@ -730,14 +832,14 @@ static void add_client_group(Client* client, Group** groups, int nbrGroup, const
          if(groups[i]->actual == MAX_CLIENTS)
          {
             write_client(client->sock, "Can't join the group : group is full");
-            return;
+            return 1;
          }
          for(int j = 0 ; j < groups[i]->actual ; ++j)
          {
             if(!strcmp(client->name, groups[i]->members[j]->name))
             {
                write_client(client->sock, "You're already in the group!");
-               return;
+               return 1;
             }
          }
          /* add the client and increment the size */
@@ -749,7 +851,7 @@ static void add_client_group(Client* client, Group** groups, int nbrGroup, const
    if(error)
    {
       write_client(client->sock, "This group doesn't exist");
-      return;
+      return 1;
    }
 
    FILE* fptr;
@@ -758,7 +860,7 @@ static void add_client_group(Client* client, Group** groups, int nbrGroup, const
    if((fptr = fopen(group, "a+")) == NULL) { 
       perror("Error : File doesn\'t exist\n");
       write_client(client->sock, "Error : File doesn\'t exist");
-      return;
+      return 1;
    }
    /* go to the start of the file just to be sure */
    fseek(fptr, 0, SEEK_SET);
@@ -770,7 +872,7 @@ static void add_client_group(Client* client, Group** groups, int nbrGroup, const
    /* don't forget to close the file */
    fclose(fptr);
 
-   return;
+   return 0;
 }
 
 static void init_groups(Client* clients, int nbCli, Group*** groups, int* nbGp)

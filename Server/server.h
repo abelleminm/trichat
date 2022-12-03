@@ -50,7 +50,7 @@ static void add_to_group_history(const char* message, Group* group);
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
 static Client get_client_by_name(Client *clients, const char *name, int actual);
-static void add_client_group(Client* client, Group** groups, int nbrGroup, const char *group);
+static int add_client_group(Client* client, Group** groups, int nbrGroup, const char *group);
 static void init_groups(Client* clients, int nbCli, Group*** groups, int* nbGp);
 
 #endif /* guard */
