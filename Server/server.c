@@ -101,6 +101,11 @@ static void app(void)
          *c = '\0';
       }
 
+      /* we create the group then we will add all the members */
+      Group* g = (Group*) malloc(sizeof(Group));
+      strncpy(g->name, line, BUF_SIZE - 1);
+      g->actual = 0;
+
       /* we open the associated group file */
       FILE* file;
       if((file = fopen(line, "r")) == NULL) { 
@@ -109,11 +114,6 @@ static void app(void)
       }
       /* go to the start of the file just to be sure */
       fseek(file, 0, SEEK_SET);
-
-      /* we create the group then we will add all the members */
-      Group* g = (Group*) malloc(sizeof(Group));
-      strncpy(g->name, line, BUF_SIZE - 1);
-      g->actual = 0;
 
       char* fline = NULL;
       size_t length = 0;
@@ -132,7 +132,7 @@ static void app(void)
             /* when we find the name in the array then we add the client's pointer to our members array */
             if(!strcmp(clients[i].name, fline))
             {
-               g->members[g->actual] = &clients[i];
+               g->members[g->actual++] = &clients[i];
             }
          }
       }
@@ -148,21 +148,6 @@ static void app(void)
    free(line);
    /* don't forget to close the file */
    fclose(fptr);
-
-   printf("=========\ninfos:\nclients:\n");
-   for(int i = 0; i<actual; ++i)
-   {
-      printf("%s\n", clients[i].name);
-   }
-   printf("groups:\n");
-   for(int i = 0; i<nbrGroup; ++i)
-   {
-      printf("%s\n", groups[i]->name);
-      for(int j = 0; j<groups[i]->actual; ++j)
-      {
-         printf("-%s\n", groups[i]->members[j]->name);
-      }
-   }
 
    fd_set rdfs;
 
