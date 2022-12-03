@@ -277,6 +277,8 @@ static void app(void)
                         
                         /* we add the creator of the group to the group */
                         add_client_group(&clients[index], groups, nbrGroup, group);
+
+                        write_client(client.sock, "Group created");
                      }
                      else if(!strcmp(command, "join")) // user wants to join a group chat
                      {
@@ -304,6 +306,8 @@ static void app(void)
                         }
                         /* send a message to all clients in the group to let them know someone joined */
                         send_message_to_group(groups[gpIndex],client,NULL,1);
+
+                        write_client(client.sock, "Group joined");
                      }
                      else
                      {
@@ -634,9 +638,16 @@ static void add_client_group(Client* client, Group** groups, int nbrGroup, const
    return;
 }
 
+static void init_data(void)
+{
+   
+}
+
 int main(int argc, char **argv)
 {
    init();
+
+   init_data();
 
    app();
 
