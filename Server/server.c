@@ -324,8 +324,18 @@ static void app(void)
                      *message = 0;
                      message++;
                      Client destinataire = get_client_by_name(clients, name, actual);
-                     if(destinataire.sock != -1)
+                     if(destinataire.sock == -1) // get_client_by_name returns a client with sock = -1 if the client doesn't exist
                      {
+                        write_client(client.sock, "This user doesn\'t exist");
+                     }
+                     else
+                     {
+                        if(destinataire.sock == NULL) // because of the init of the data, a client can exist but not be connected => not connected means sock = NULL
+                        {
+                           write_client(client.sock, "This user isn\'t connected and therefore won\'t recieve this message");
+                           continue;
+                        }
+                        /* if the client exists and is connected we send him the message */
                         send_message_to_one_client(destinataire, client, actual, message, 0);
                      }
                   }
