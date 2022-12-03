@@ -41,6 +41,129 @@ static void app(void)
    int nbrGroup = 0;
    Group* groups[MAX_GROUPS];
 
+   /* 
+   we want to instanciate all the existing clients and all the groups
+   we will have all clients instanciated in the array event though they are not connected 
+   => just add the socket number when connect and NULL it when disconnect
+   TODO : modify connection process
+   */
+
+   /* we first create all our clients */
+   FILE* fptr;
+   /* we open the file in read mode => if it doens't exist then no need for instanciation */
+   if((fptr = fopen("clients", "r")) == NULL) { 
+      perror("Error : Error opening file \'clients\'\n");
+   } else { // if the file has opened correctly
+      /* go to the start of the file just to be sure */
+      fseek(fptr, 0, SEEK_SET);
+
+      char* line = NULL;
+      size_t len = 0;
+      ssize_t nread;
+      /* we read each line */
+      while((nread = getline(&line, &len, fptr)) != -1) {
+         /* we get rid of the \n because getline keeps it */
+         char* c = strchr(line, '\n');
+         if(c){
+            *c = '\0';
+         }
+
+         /* we create the client associated with the name we just got */
+         Client cli = { };
+         strncpy(cli.name, line, BUF_SIZE - 1);
+         clients[actual] = cli;
+         actual++;
+      }
+      /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+      free(line);
+      /* don't forget to close the file */
+      fclose(fptr);
+   }
+
+   /* we then instanciate all the groups */
+   /* we open the groups file and then for each line (each group) we open the associated file */
+   /* we open the file in read mode => if it doens't exist then no need for instanciation */
+   if((fptr = fopen("groups", "r")) == NULL) { 
+      perror("Error : Error opening file \'groups\'\n");
+      return;
+   }
+   /* go to the start of the file just to be sure */
+   fseek(fptr, 0, SEEK_SET);
+
+   char* line = NULL;
+   size_t len = 0;
+   ssize_t nread;
+   /* we read each line */
+   while((nread = getline(&line, &len, fptr)) != -1) {
+      /* we get rid of the \n because getline keeps it */
+      char* c = strchr(line, '\n');
+      if(c){
+         *c = '\0';
+      }
+
+      /* we open the associated group file */
+      FILE* file;
+      if((file = fopen(line, "r")) == NULL) { 
+         perror("Error : Error opening file\n");
+         return;
+      }
+      /* go to the start of the file just to be sure */
+      fseek(file, 0, SEEK_SET);
+
+      /* we create the group then we will add all the members */
+      Group* g = (Group*) malloc(sizeof(Group));
+      strncpy(g->name, line, BUF_SIZE - 1);
+      g->actual = 0;
+
+      char* fline = NULL;
+      size_t length = 0;
+      ssize_t read;
+      /* we read each line */
+      while((read = getline(&fline, &length, file)) != -1) {
+         /* we get rid of the \n because getline keeps it */
+         char* car = strchr(fline, '\n');
+         if(car){
+            *car = '\0';
+         }
+
+         /* we seach in the clients list and we put the client in the members list */
+         for(int i=0; i<actual; ++i)
+         {
+            /* when we find the name in the array then we add the client's pointer to our members array */
+            if(!strcmp(clients[i].name, fline))
+            {
+               g->members[g->actual] = &clients[i];
+            }
+         }
+      }
+      /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+      free(fline);
+      /* don't forget to close the file */
+      fclose(file);
+
+      /* we then add the group created to the groups array and increment the number of groups */
+      groups[nbrGroup++] = g;
+   }
+   /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+   free(line);
+   /* don't forget to close the file */
+   fclose(fptr);
+
+   printf("=========\ninfos:\nclients:\n");
+   for(int i = 0; i<actual; ++i)
+   {
+      printf("%s\n", clients[i].name);
+   }
+   printf("groups:\n");
+   for(int i = 0; i<nbrGroup; ++i)
+   {
+      printf("%s\n", groups[i]->name);
+      for(int j = 0; j<groups[i]->actual; ++j)
+      {
+         printf("-%s\n", groups[i]->members[j]->name);
+      }
+   }
+
    fd_set rdfs;
 
    while(1)
@@ -98,14 +221,25 @@ static void app(void)
             ++nbchar;
          }
 
-         /* we can't have twice the same person logged in => check if there is already a client with this name */
+         /* 
+         we can't have twice the same person logged in => check if there is already a client with this name
+         because of the init process we will always have a client with the same name if the person has already connected once
+         we need to check the socket => if it is not NULL then the client is connected, else the client exists but isn't connected
+         */
          int exists = 0;
+         int index = 0;
+         int connected = 0;
          for(int i=0; i<actual; ++i) {
             if(!strcmp(clients[i].name,buffer)) { // if the name of a client is equal to the one recieved (strcmp returns 0) then we want to disconnect the client
                exists = 1;
+               index = i;
+               if(clients[i].sock != NULL)
+               {
+                  connected = 1;
+               }
             } 
          }
-         if(exists) { // if the name was found we just continue and send a message to the client saying he can't connect with this name
+         if(connected) { // if the name was found we just continue and send a message to the client saying he can't connect with this name
             write_client(csock, "You can't connect with this username because it is already in use");
             closesocket(csock);
             continue;
@@ -115,10 +249,16 @@ static void app(void)
 
          FD_SET(csock, &rdfs);
 
-         Client c = { csock };
-         strncpy(c.name, buffer, BUF_SIZE - 1);
-         clients[actual] = c;
-         actual++;
+         if(exists) // if the client already existed then we just have to assign him his socket
+         {
+            clients[index].sock = csock;
+         } else // if the client didn't already exist then we have to create the client
+         {
+            Client c = { csock };
+            strncpy(c.name, buffer, BUF_SIZE - 1);
+            clients[actual] = c;
+            actual++;
+         }
 
          /* we write the name of the client in the clients file if it is not present (new connection) */
          /* first we read the file and search if the name provided already exists */
@@ -467,7 +607,7 @@ static void send_message_to_all_clients(Client *clients, Client sender, int actu
    for(i = 0; i < actual; i++)
    {
       /* we don't send message to the sender */
-      if(sender.sock != clients[i].sock)
+      if((sender.sock != clients[i].sock) && (clients[i].sock != NULL))
       {
          if(from_server == 0)
          {
@@ -638,16 +778,82 @@ static void add_client_group(Client* client, Group** groups, int nbrGroup, const
    return;
 }
 
-static void init_data(void)
+static void init_groups(Client* clients, int nbCli, Group*** groups, int* nbGp)
 {
-   
+   /* we open the groups file and then for each line (each group) we open the associated file */
+   FILE* fptr;
+   /* we open the file in read mode => if it doens't exist then no need for instanciation */
+   if((fptr = fopen("groups", "r")) == NULL) { 
+      perror("Error : Error opening file \'groups\'\n");
+      return;
+   }
+   /* go to the start of the file just to be sure */
+   fseek(fptr, 0, SEEK_SET);
+
+   char* line = NULL;
+   size_t len = 0;
+   ssize_t nread;
+   /* we read each line */
+   while((nread = getline(&line, &len, fptr)) != -1) {
+      /* we get rid of the \n because getline keeps it */
+      char* c = strchr(line, '\n');
+      if(c){
+         *c = '\0';
+      }
+
+      /* we open the associated group file */
+      FILE* file;
+      if((file = fopen(line, "r")) == NULL) { 
+         perror("Error : Error opening file\n");
+         return;
+      }
+      /* go to the start of the file just to be sure */
+      fseek(file, 0, SEEK_SET);
+
+      /* we create the group then we will add all the members */
+      Group* g = (Group*) malloc(sizeof(Group));
+      strncpy(g->name, line, BUF_SIZE - 1);
+      g->actual = 0;
+
+      char* fline = NULL;
+      size_t length = 0;
+      ssize_t read;
+      /* we read each line */
+      while((read = getline(&fline, &length, file)) != -1) {
+         /* we get rid of the \n because getline keeps it */
+         char* car = strchr(fline, '\n');
+         if(car){
+            *car = '\0';
+         }
+
+         /* we seach in the clients list and we put the client in the members list */
+         for(int i=0; i<nbCli; ++i)
+         {
+            /* when we find the name in the array then we add the client's pointer to our members array */
+            if(!strcmp(clients[i].name, fline))
+            {
+               g->members[g->actual] = &clients[i];
+            }
+         }
+      }
+      /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+      free(fline);
+      /* don't forget to close the file */
+      fclose(file);
+
+      /* we then add the group created to the groups array and increment the number of groups */
+      *groups[*nbGp] = g;
+      nbGp++;
+   }
+   /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+   free(line);
+   /* don't forget to close the file */
+   fclose(fptr);
 }
 
 int main(int argc, char **argv)
 {
    init();
-
-   init_data();
 
    app();
 
