@@ -31,6 +31,7 @@ static void end(void)
 static void app(void)
 {
    SOCKET sock = init_connection();
+   printf ("Server Trichat started\n");  
    char buffer[BUF_SIZE];
    /* the index for the array */
    int actual = 0;
@@ -325,6 +326,7 @@ static void app(void)
                      *message = 0;
                      message++;
                      Client destinataire = get_client_by_name(clients, name, actual);
+                     
                      if(destinataire.sock == -1) // get_client_by_name returns a client with sock = -1 if the client doesn't exist
                      {
                         write_client(client.sock, "This user doesn\'t exist");
@@ -333,7 +335,8 @@ static void app(void)
                      {
                         if(destinataire.sock == NULL) // because of the init of the data, a client can exist but not be connected => not connected means sock = NULL
                         {
-                           write_client(client.sock, "This user isn\'t connected and therefore won\'t recieve this message");
+                           write_client(client.sock, "This user isn\'t connected, your message will be added to their mailbox.");
+                           add_to_mailbox(message,destinataire);
                            continue;
                         }
                         /* if the client exists and is connected we send him the message */
@@ -348,11 +351,19 @@ static void app(void)
                      {
                         continue;
                      }
-                     // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
-                     *group = 0; 
-                     group++;
+                     if(group != NULL)
+                     {
+                        // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
+                        *group = 0; 
+                        group++;
+                     }
                      if(!strcmp(command, "create")) // user wants to create a group chat
                      {
+                        if(group == NULL)
+                        {
+                           write_client(client.sock, "Usage : !create [group_name]");
+                           continue;
+                        }
                         /* first we need to check if the conversation doesn't already exist */
                         FILE* fptr;
                         /* we open the file in write only => if it doesn't exist, it will return NULL */
@@ -418,6 +429,12 @@ static void app(void)
                      }
                      else if(!strcmp(command, "join")) // user wants to join a group chat
                      {
+                        if(group == NULL)
+                        {
+                           write_client(client.sock, "Usage : !join [group_name]");
+                           continue;
+                        }
+
                         int index;
                         for(int i = 0; i<actual; ++i)
                         {
@@ -457,6 +474,12 @@ static void app(void)
                         then we count the number of lines (messages) and subtract 10 to get the number of lines to skip
                         then we read the file, skip the x first lines and just print the rest
                         */
+
+                        if(group == NULL)
+                        {
+                           write_client(client.sock, "Usage : !histo [group_name]");
+                           continue;
+                        }
 
                         /* does the user belong to he group ? and does the group exist ? */
                         int found = 0;
@@ -545,6 +568,12 @@ static void app(void)
 
                         /* don't forget to close the file */
                         fclose(fptr);
+                     }
+                     else if(!strcmp(command, "quit"))
+                     {
+                        closesocket(client.sock);
+                        client.sock=NULL;
+                        printf("Client %s disconnected\n", client.name);
                      }
                      else
                      {
@@ -680,6 +709,36 @@ static void add_to_group_history(const char* message, Group* group)
       return;
    }
    /* we write the message into the file + we add the timestamp to it => format of message in history : (timestamp) message\n */
+   time_t timestamp = time(NULL);
+   char* time = ctime(&timestamp);
+   fputc('(', fptr);
+   /* the string returned by ctime is terminated by a \n */
+   char* c = strchr(time, '\n');
+   if(c){
+      *c = '\0';
+   }
+   fputs(time, fptr);
+   fputs(") ", fptr);
+   fputs(message, fptr);
+   fputc('\n', fptr);
+   /* don't forget to close the file */
+   fclose(fptr);
+}
+
+static void add_to_mailbox(const char* message, Client dest)
+{
+   /* we first open the file in append mode => build the name */
+   char filename[BUF_SIZE];
+   filename[0] = 0;
+   strncpy(filename, dest.name, BUF_SIZE - 1);
+   strncat(filename, "_mailbox", sizeof filename - strlen(filename) - 1);
+   FILE* fptr;
+   /* then we open it in append mode to add the message */
+   if((fptr = fopen(filename, "a")) == NULL) { 
+      perror("Error : Error opening the mailbox file\n");
+      return;
+   }
+   /* we write the message into the file + we add the timestamp to it => format of message in mailbox : (timestamp) message\n */
    time_t timestamp = time(NULL);
    char* time = ctime(&timestamp);
    fputc('(', fptr);
