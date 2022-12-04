@@ -4,6 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
+#include <sys/stat.h>
 
 #include "server.h"
 #include "client.h"
@@ -514,6 +515,38 @@ static void app(void)
                            write_client(client.sock, "Group joined");
                         }
                      }
+                     else if(!strcmp(command, "leave")) // user wants to leave a group chat
+                     {
+                        int index;
+                        for(int i = 0; i<actual; ++i)
+                        {
+                           if(!strcmp(client.name, clients[i].name))
+                           {
+                              index = i;
+                              break;
+                           }
+                        }
+
+                        /* we add the client to the group */
+                        int err = leave_group(&clients[index], groups, nbrGroup, group);
+
+                        if(!err) // we send the messages only if the group was successfully left
+                        {
+                           int gpIndex;
+                           for(int i=0; i<nbrGroup; ++i)
+                           {
+                              if(!strcmp(groups[i]->name, group))
+                              {
+                                 gpIndex = i;
+                                 break;
+                              }
+                           }
+                           /* send a message to all clients in the group to let them know someone left */
+                           send_message_to_group(groups[gpIndex],client,NULL,2);
+
+                           write_client(client.sock, "Group left");
+                        }
+                     }
                      else if(!strcmp(command, "histo"))
                      {
                         /* the user want's to display the message history of the group => by default we give the 10 last messages */
@@ -714,15 +747,21 @@ static void remove_client(Client *clients, int to_remove, int *actual)
    clients[to_remove].sock = NULL;
 }
 
-static void send_message_to_group(Group* group, Client sender, const char* message, char from_server)
+static void send_message_to_group(Group* group, Client sender, const char* message, int from_server)
 {
    /* we build the message */
    char buffer[BUF_SIZE];
    buffer[0] = 0;
    /* manages the "join" message */
-   if(from_server) {
+   if(from_server == 1) {
       strncpy(buffer, sender.name, BUF_SIZE - 1);
       strncat(buffer, " joined ", sizeof buffer - strlen(buffer) - 1);
+      strncat(buffer, group->name, sizeof buffer - strlen(buffer) - 1);
+      strncat(buffer, " !", sizeof buffer - strlen(buffer) - 1);
+   }else if(from_server == 2)
+   {
+      strncpy(buffer, sender.name, BUF_SIZE - 1);
+      strncat(buffer, " left ", sizeof buffer - strlen(buffer) - 1);
       strncat(buffer, group->name, sizeof buffer - strlen(buffer) - 1);
       strncat(buffer, " !", sizeof buffer - strlen(buffer) - 1);
    } else { /* or if it is just a normal message */
@@ -970,8 +1009,112 @@ static int add_client_group(Client* client, Group** groups, int nbrGroup, const 
    return 0;
 }
 
+//leave a group
+/* function returns 0 for success, 1 if the person couldn't leave the group for any reason */
+static int leave_group(Client* client, Group** groups, int nbrGroup, const char *group)
+{
+   int error = 1;
+   /* Search the group in struct */
+   for(int i = 0 ; i < nbrGroup ; ++i)
+   {
+      if(!strcmp(groups[i]->name, group))
+      {
+         /* Search for the client */
+         for(int j = 0 ; j < groups[i]->actual ; ++j)
+         {
+            if(!strcmp(client->name, groups[i]->members[j]->name))
+            {
+               /* case when it is not the end of the list */
+               if(j != groups[i]->actual-1)
+               {
+                  groups[i]->members[j] = groups[i]->members[groups[i]->actual-1];
+               }
+               groups[i]->members[groups[i]->actual-1] = NULL;
+               groups[i]->actual--;
+               error = 0;
+               break;               
+            }
+         }
+         if(error)
+         {
+            write_client(client->sock, "You are not in this group!");
+            return 1;
+         }
+      }
+   }
+   if(error)
+   {
+      write_client(client->sock, "This group doesn't exist");
+      return 1;
+   }
+
+   FILE* fptr;
+   FILE* ftmp;
+   /* want to delete the name of the person who left */
+   char filename[BUF_SIZE];
+   filename[0] = 0;
+   strncpy(filename, "Data/", BUF_SIZE - 1);
+   strncat(filename, group, sizeof filename - strlen(filename) - 1);
+   strncat(filename, "/", sizeof filename - strlen(filename) - 1);
+   strncat(filename, group, sizeof filename - strlen(filename) - 1);
+   /* we open the file in read append => we know it exists but it will not work if it doesn't (just in case) */
+   if((fptr = fopen(filename, "a+")) == NULL) { 
+      perror("Error : File doesn\'t exist\n");
+      write_client(client->sock, "Error : File doesn\'t exist");
+      return 1;
+   }
+
+   char tmp[BUF_SIZE];
+   tmp[0] = 0;
+   strncpy(tmp, "Data/", BUF_SIZE - 1);
+   strncat(tmp, group, sizeof filename - strlen(filename) - 1);
+   strncat(tmp, "/tmp", sizeof filename - strlen(filename) - 1);
+   ftmp = fopen(tmp, "w");
+
+   /* go to the start of the file just to be sure */
+   fseek(fptr, 0, SEEK_SET);
+
+   char* line = NULL;
+   size_t len = 0;
+   ssize_t nread;
+   /* we read each line */
+   while((nread = getline(&line, &len, fptr)) != -1) 
+   {
+      /* we get rid of the \n because getline keeps it */
+      char* c = strchr(line, '\n');
+      if(c){
+         *c = '\0';
+      }
+      if(strcmp(line,client->name))
+      {
+         fputs(line, ftmp);
+         fputs("\n", ftmp);		
+      }
+   }
+
+   /* don't forget to close the files */
+   fclose(fptr);
+   fclose(ftmp);
+   free(line);
+
+   remove(filename);
+   rename(tmp, filename);
+
+   return 0;
+}
+
 int main(int argc, char **argv)
 {
+   /* creating */
+   if ( mkdir("Data", 755) != 0 )
+   {
+      if (errno == EACCES)
+      {
+         printf("Can't create the data folder, you don't have the rights.\n");
+         exit(EXIT_FAILURE);
+      }
+   }
+
    init();
 
    app();
