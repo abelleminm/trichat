@@ -17,14 +17,22 @@ Ecrire directement depuis son terminal envoie un message à toutes les personnes
 - !command : permet d'effectuer une commande directement au serveur.
 
 ## Commandes pour le serveur (précédé de "!")
+Commandes générales :
+- !quit permet de quitter le serveur : déconnecte l'utilisateur comme si celui-ci avait fermé la connexion avec un Ctrl+C
+- !mailbox permet de lire les messages privés qui ont été envoyés à l'utilisateur pendant son absence (déconnexion)
+- !groups permet de lister tous les groupes connus
+- !mygroups permet de lister tous les groupes dont l'utilisateur fait partie
+
+Commandes relatives aux groupes :
 - !create nomDuGroupe : permet de créer un groupe au nom de nomDuGroupe
 - !join nomDuGroupe : permet à un utilisateur de rejoindre le groupe "nomDuGroupe"
 - !histo nomDuGroupe : liste les 10 derniers messages du groupe "nomDuGroupe"
+- !leave nomDuGroupe : permet à l'utilisateur de quitter le groupe "nomDuGroupe"
 
 ## Traitement des cas limites :
 - Pour l'envoie de messages privés : l'utilisateur est prévenu si 
   * il essaye d'envoyer un message a un utilisateur qui n'existe pas
-  * le destinataire existe mais n'est pas connecté (et ne recevra donc pas le message)
+  * le destinataire existe mais n'est pas connecté => le message part dans la mailbox de l'utilisateur en question
 - Pour l'envoie de messages à un groupe : l'utilisateur est notifié si il essaye d'envoyer un message à un groupe
   * qui n'existe pas 
   * dont il ne fait pas partie
