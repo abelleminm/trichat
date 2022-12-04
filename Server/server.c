@@ -85,69 +85,70 @@ static void app(void)
    /* we open the file in read mode => if it doens't exist then no need for instanciation */
    if((fptr = fopen("groups", "r")) == NULL) { 
       perror("Error : Error opening file \'groups\'\n");
-      return;
-   }
-   /* go to the start of the file just to be sure */
-   fseek(fptr, 0, SEEK_SET);
-
-   char* line = NULL;
-   size_t len = 0;
-   ssize_t nread;
-   /* we read each line */
-   while((nread = getline(&line, &len, fptr)) != -1) {
-      /* we get rid of the \n because getline keeps it */
-      char* c = strchr(line, '\n');
-      if(c){
-         *c = '\0';
-      }
-
-      /* we create the group then we will add all the members */
-      Group* g = (Group*) malloc(sizeof(Group));
-      strncpy(g->name, line, BUF_SIZE - 1);
-      g->actual = 0;
-
-      /* we open the associated group file */
-      FILE* file;
-      if((file = fopen(line, "r")) == NULL) { 
-         perror("Error : Error opening file\n");
-         return;
-      }
+   } else
+   {
       /* go to the start of the file just to be sure */
-      fseek(file, 0, SEEK_SET);
+      fseek(fptr, 0, SEEK_SET);
 
-      char* fline = NULL;
-      size_t length = 0;
-      ssize_t read;
+      char* line = NULL;
+      size_t len = 0;
+      ssize_t nread;
       /* we read each line */
-      while((read = getline(&fline, &length, file)) != -1) {
+      while((nread = getline(&line, &len, fptr)) != -1) {
          /* we get rid of the \n because getline keeps it */
-         char* car = strchr(fline, '\n');
-         if(car){
-            *car = '\0';
+         char* c = strchr(line, '\n');
+         if(c){
+            *c = '\0';
          }
 
-         /* we seach in the clients list and we put the client in the members list */
-         for(int i=0; i<actual; ++i)
-         {
-            /* when we find the name in the array then we add the client's pointer to our members array */
-            if(!strcmp(clients[i].name, fline))
+         /* we create the group then we will add all the members */
+         Group* g = (Group*) malloc(sizeof(Group));
+         strncpy(g->name, line, BUF_SIZE - 1);
+         g->actual = 0;
+
+         /* we open the associated group file */
+         FILE* file;
+         if((file = fopen(line, "r")) == NULL) { 
+            perror("Error : Error opening file\n");
+            continue;
+         }
+         /* go to the start of the file just to be sure */
+         fseek(file, 0, SEEK_SET);
+
+         char* fline = NULL;
+         size_t length = 0;
+         ssize_t read;
+         /* we read each line */
+         while((read = getline(&fline, &length, file)) != -1) {
+            /* we get rid of the \n because getline keeps it */
+            char* car = strchr(fline, '\n');
+            if(car){
+               *car = '\0';
+            }
+
+            /* we seach in the clients list and we put the client in the members list */
+            for(int i=0; i<actual; ++i)
             {
-               g->members[g->actual++] = &clients[i];
+               /* when we find the name in the array then we add the client's pointer to our members array */
+               if(!strcmp(clients[i].name, fline))
+               {
+                  g->members[g->actual++] = &clients[i];
+               }
             }
          }
+         /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+         free(fline);
+         /* don't forget to close the file */
+         fclose(file);
+
+         /* we then add the group created to the groups array and increment the number of groups */
+         groups[nbrGroup++] = g;
       }
       /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
-      free(fline);
+      free(line);
       /* don't forget to close the file */
-      fclose(file);
-
-      /* we then add the group created to the groups array and increment the number of groups */
-      groups[nbrGroup++] = g;
+      fclose(fptr);
    }
-   /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
-   free(line);
-   /* don't forget to close the file */
-   fclose(fptr);
 
    fd_set rdfs;
 
