@@ -51,7 +51,7 @@ static void app(void)
    /* we first create all our clients */
    FILE* fptr;
    /* we open the file in read mode => if it doens't exist then no need for instanciation */
-   if((fptr = fopen("clients", "r")) == NULL) { 
+   if((fptr = fopen("Data/clients", "r")) == NULL) { 
       perror("Error : Error opening file \'clients\'\n");
    } else { // if the file has opened correctly
       /* go to the start of the file just to be sure */
@@ -83,7 +83,7 @@ static void app(void)
    /* we then instanciate all the groups */
    /* we open the groups file and then for each line (each group) we open the associated file */
    /* we open the file in read mode => if it doens't exist then no need for instanciation */
-   if((fptr = fopen("groups", "r")) == NULL) { 
+   if((fptr = fopen("Data/groups", "r")) == NULL) { 
       perror("Error : Error opening file \'groups\'\n");
    } else
    {
@@ -108,7 +108,13 @@ static void app(void)
 
          /* we open the associated group file */
          FILE* file;
-         if((file = fopen(line, "r")) == NULL) { 
+         char filename[BUF_SIZE];
+         filename[0] = 0;
+         strncpy(filename, "Data/", BUF_SIZE - 1);
+         strncat(filename, line, sizeof filename - strlen(filename) - 1);
+         strncat(filename, "/", sizeof filename - strlen(filename) - 1);
+         strncat(filename, line, sizeof filename - strlen(filename) - 1);
+         if((file = fopen(filename, "r")) == NULL) { 
             perror("Error : Error opening file\n");
             continue;
          }
@@ -250,7 +256,7 @@ static void app(void)
          /* first we read the file and search if the name provided already exists */
          FILE* fptr;
          /* we open the file in read and append => if it doesn't exist it is created */
-         if((fptr = fopen("clients", "a+")) == NULL) { 
+         if((fptr = fopen("Data/clients", "a+")) == NULL) { 
             perror("Error : Error opening file \'clients\'\n");
             exit(EXIT_FAILURE);
          }
@@ -355,8 +361,15 @@ static void app(void)
                      {
                         /* first we need to check if the conversation doesn't already exist */
                         FILE* fptr;
+                        /* first we build the filename */
+                        char filename[BUF_SIZE];
+                        filename[0] = 0;
+                        strncpy(filename, "Data/", BUF_SIZE - 1);
+                        strncat(filename, group, sizeof filename - strlen(filename) - 1);
+                        strncat(filename, "/", sizeof filename - strlen(filename) - 1);
+                        strncat(filename, group, sizeof filename - strlen(filename) - 1);
                         /* we open the file in write only => if it doesn't exist, it will return NULL */
-                        if((fptr = fopen(group, "r")) != NULL) { 
+                        if((fptr = fopen(filename, "r")) != NULL) { 
                            perror("Error : File doesn\'t exist\n");
                            write_client(client.sock, "This conversation already exist");
                            /* don't forget that the file was opened if we get in the if so we need to close it */
@@ -366,7 +379,7 @@ static void app(void)
                         /* we don't need to close the file because if we got past the if statement it means it doesn't exists and wasn't opened */
 
                         /* we will add the name of the group to the file with all the group names (we know the group doesn't exist) => create the file if it doesn't exist */
-                        if((fptr = fopen("groups", "a+")) == NULL) { 
+                        if((fptr = fopen("Data/groups", "a+")) == NULL) { 
                            perror("Error : Error opening file \'groups\'\n");
                            continue;
                         }
@@ -376,10 +389,15 @@ static void app(void)
                         fclose(fptr);
                         
                         /* when the group is created, we have to create the file to store the message history => name = groupname_histo */
-                        /* first we build the filename */
-                        char filename[BUF_SIZE];
-                        filename[0] = 0;
-                        strncpy(filename, group, BUF_SIZE - 1);
+                        /* but first we create the directory to put all the files */
+                        /* first we build the command for making the directory */
+                        char mkdir[BUF_SIZE];
+                        mkdir[0] = 0;
+                        strncpy(mkdir, "mkdir Data/", BUF_SIZE - 1);
+                        strncat(mkdir, group, sizeof filename - strlen(filename) - 1);
+                        /* we create the directory */
+                        system(mkdir);
+                        /* we modify the filename */
                         strncat(filename, "_histo", sizeof filename - strlen(filename) - 1);
                         /* then we open it in read append mode to create the file */
                         if((fptr = fopen(filename, "a+")) == NULL) { 
@@ -494,7 +512,10 @@ static void app(void)
                         /* we open the file in read only : if the file doesn't exist then the group doesn't exist */
                         char filename[BUF_SIZE];
                         filename[0] = 0;
-                        strncpy(filename, group, BUF_SIZE - 1);
+                        strncpy(filename, "Data/", BUF_SIZE - 1);
+                        strncat(filename, group, sizeof filename - strlen(filename) - 1);
+                        strncat(filename, "/", sizeof filename - strlen(filename) - 1);
+                        strncat(filename, group, sizeof filename - strlen(filename) - 1);
                         strncat(filename, "_histo", sizeof filename - strlen(filename) - 1);
                         if((fptr = fopen(filename, "r")) == NULL) { 
                            perror("Error : Group doesn\'t exist\n");
@@ -671,7 +692,10 @@ static void add_to_group_history(const char* message, Group* group)
    /* we first open the file in append mode => build the name */
    char filename[BUF_SIZE];
    filename[0] = 0;
-   strncpy(filename, group->name, BUF_SIZE - 1);
+   strncpy(filename, "Data/", BUF_SIZE - 1);
+   strncat(filename, group->name, sizeof filename - strlen(filename) - 1);
+   strncat(filename, "/", sizeof filename - strlen(filename) - 1);
+   strncat(filename, group->name, sizeof filename - strlen(filename) - 1);
    strncat(filename, "_histo", sizeof filename - strlen(filename) - 1);
    FILE* fptr;
    /* then we open it in append mode to add the message */
@@ -860,8 +884,14 @@ static int add_client_group(Client* client, Group** groups, int nbrGroup, const 
 
    FILE* fptr;
    /* want to add the name of the person who joins to the file */
+   char filename[BUF_SIZE];
+   filename[0] = 0;
+   strncpy(filename, "Data/", BUF_SIZE - 1);
+   strncat(filename, group, sizeof filename - strlen(filename) - 1);
+   strncat(filename, "/", sizeof filename - strlen(filename) - 1);
+   strncat(filename, group, sizeof filename - strlen(filename) - 1);
    /* we open the file in read append => we know it exists but it will not work if it doesn't (just in case) */
-   if((fptr = fopen(group, "a+")) == NULL) { 
+   if((fptr = fopen(filename, "a+")) == NULL) { 
       perror("Error : File doesn\'t exist\n");
       write_client(client->sock, "Error : File doesn\'t exist");
       return 1;
@@ -877,79 +907,6 @@ static int add_client_group(Client* client, Group** groups, int nbrGroup, const 
    fclose(fptr);
 
    return 0;
-}
-
-static void init_groups(Client* clients, int nbCli, Group*** groups, int* nbGp)
-{
-   /* we open the groups file and then for each line (each group) we open the associated file */
-   FILE* fptr;
-   /* we open the file in read mode => if it doens't exist then no need for instanciation */
-   if((fptr = fopen("groups", "r")) == NULL) { 
-      perror("Error : Error opening file \'groups\'\n");
-      return;
-   }
-   /* go to the start of the file just to be sure */
-   fseek(fptr, 0, SEEK_SET);
-
-   char* line = NULL;
-   size_t len = 0;
-   ssize_t nread;
-   /* we read each line */
-   while((nread = getline(&line, &len, fptr)) != -1) {
-      /* we get rid of the \n because getline keeps it */
-      char* c = strchr(line, '\n');
-      if(c){
-         *c = '\0';
-      }
-
-      /* we open the associated group file */
-      FILE* file;
-      if((file = fopen(line, "r")) == NULL) { 
-         perror("Error : Error opening file\n");
-         return;
-      }
-      /* go to the start of the file just to be sure */
-      fseek(file, 0, SEEK_SET);
-
-      /* we create the group then we will add all the members */
-      Group* g = (Group*) malloc(sizeof(Group));
-      strncpy(g->name, line, BUF_SIZE - 1);
-      g->actual = 0;
-
-      char* fline = NULL;
-      size_t length = 0;
-      ssize_t read;
-      /* we read each line */
-      while((read = getline(&fline, &length, file)) != -1) {
-         /* we get rid of the \n because getline keeps it */
-         char* car = strchr(fline, '\n');
-         if(car){
-            *car = '\0';
-         }
-
-         /* we seach in the clients list and we put the client in the members list */
-         for(int i=0; i<nbCli; ++i)
-         {
-            /* when we find the name in the array then we add the client's pointer to our members array */
-            if(!strcmp(clients[i].name, fline))
-            {
-               g->members[g->actual] = &clients[i];
-            }
-         }
-      }
-      /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
-      free(fline);
-      /* don't forget to close the file */
-      fclose(file);
-
-      /* we then add the group created to the groups array and increment the number of groups */
-      *groups[*nbGp] = g;
-      nbGp++;
-   }
-   /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
-   free(line);
-   /* don't forget to close the file */
-   fclose(fptr);
 }
 
 int main(int argc, char **argv)
