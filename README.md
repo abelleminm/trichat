@@ -42,3 +42,7 @@ Commandes relatives aux groupes :
   * rejoindre un groupe qui n'existe pas
   * afficher l'historique d'un groupe qui n'existe pas
   * afficher l'historique d'un groupe dont il ne fait pas partie
+- Pour la lecture de mailbox : l'utilisateur est averti si
+  * il essait de lire sa mailbox alors qu'elle est vide
+  
+
