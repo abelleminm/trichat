@@ -440,7 +440,8 @@ static void app(void)
 
                         /* don't forget to close the file */
                         fclose(fptr);
-                        //fclose(fopen(filename, "w"));
+                        /* Then we want the mailbox to be cleared */
+                        fclose(fopen(filename, "w"));
                         printf("Client %s read his mailbox, it was then cleaned\n", client.name);
                         continue;
                      }
