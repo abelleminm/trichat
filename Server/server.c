@@ -80,6 +80,8 @@ static void app(void)
       free(line);
       /* don't forget to close the file */
       fclose(fptr);
+
+      printf("Clients saved in clients file are instanciated\n");
    }
 
    /* we then instanciate all the groups */
@@ -246,12 +248,14 @@ static void app(void)
          if(exists) // if the client already existed then we just have to assign him his socket
          {
             clients[index].sock = csock;
+            printf("Known client %s connected\n", clients[index].name);           
          } else // if the client didn't already exist then we have to create the client
          {
             Client c = { csock };
             strncpy(c.name, buffer, BUF_SIZE - 1);
             clients[actual] = c;
             actual++;
+            printf("New client %s connected\n",c.name);
          }
 
          /* we write the name of the client in the clients file if it is not present (new connection) */
@@ -313,11 +317,7 @@ static void app(void)
                {
                   closesocket(clients[i].sock);
                   remove_client(clients, i, &actual);
-                  strncpy(buffer, client.name, BUF_SIZE - 1);
-                  strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
-                  Client destinataire = clients[0];
-                  send_message_to_one_client(destinataire, client, actual, buffer, 1);
-                  //send_message_to_all_clients(clients, client, actual, buffer, 1);
+                  printf("Client %s sent a null byte, he was disconnected\n", client.name);
                }
                else
                {
@@ -355,6 +355,7 @@ static void app(void)
                      if(destinataire.sock == -1) // get_client_by_name returns a client with sock = -1 if the client doesn't exist
                      {
                         write_client(client.sock, "This user doesn\'t exist");
+                        printf("Client %s tried to send a message to a non existing client\n", client.name);
                      }
                      else
                      {
@@ -362,10 +363,12 @@ static void app(void)
                         {
                            write_client(client.sock, "This user isn\'t connected, your message will be added to their mailbox.");
                            add_to_mailbox(message,destinataire,client);
+                           printf("Client %s sent a message to %s but he wasn\'t connected, the message was added to his mailbox\n", client.name, destinataire.name);
                            continue;
                         }
                         /* if the client exists and is connected we send him the message */
                         send_message_to_one_client(destinataire, client, actual, message, 0);
+                        printf("Client %s sent a message to %s\n", client.name, destinataire.name);
                      }
                   }
                   else if(buffer[0] == '!') // the user sends "!command" to execute command "command" => for groups
@@ -438,6 +441,7 @@ static void app(void)
                         /* don't forget to close the file */
                         fclose(fptr);
                         fclose(fopen(filename, "w"));
+                        printf("Client %s read his mailbox, it was then cleaned\n", client.name);
                         continue;
                      }
 
@@ -480,6 +484,7 @@ static void app(void)
                         if((fptr = fopen(filename, "r")) != NULL) { 
                            perror("Error : File doesn\'t exist\n");
                            write_client(client.sock, "This conversation already exist");
+                           printf("Client %s tried to create a conversation that already exists: %s\n", client.name, group);
                            /* don't forget that the file was opened if we get in the if so we need to close it */
                            fclose(fptr);
                            continue;
@@ -541,6 +546,7 @@ static void app(void)
                         add_client_group(&clients[index], groups, nbrGroup, group);
 
                         write_client(client.sock, "Group created");
+                        printf("Client %s created the group %s\n", client.name, group);
                      }
                      else if(!strcmp(command, "join")) // user wants to join a group chat
                      {
@@ -578,6 +584,7 @@ static void app(void)
                            send_message_to_group(groups[gpIndex],client,NULL,1);
 
                            write_client(client.sock, "Group joined");
+                           printf("User %s joined the group %s\n", client.name, group);
                         }
                      }
                      else if(!strcmp(command, "leave")) // user wants to leave a group chat
@@ -610,6 +617,7 @@ static void app(void)
                            send_message_to_group(groups[gpIndex],client,NULL,2);
 
                            write_client(client.sock, "Group left");
+                           printf("Client %s left the group %s\n", client.name, group);
                         }
                      }
                      else if(!strcmp(command, "histo"))
@@ -652,11 +660,13 @@ static void app(void)
                         if(!exists)
                         {
                            write_client(client.sock, "This group doesn\'t exist");
+                           printf("Client %s tried to access the history of a non existing group\n", client.name);
                            continue;
                         }
                         if(!found)
                         {
                            write_client(client.sock, "You can't view the history unless you are part of the group");
+                           printf("Client %s tried to access the history of a group he's not part of\n", client.name);
                            continue;
                         }
 
@@ -718,10 +728,12 @@ static void app(void)
 
                         /* don't forget to close the file */
                         fclose(fptr);
+                        printf("Client %s viewed the history of the group %s\n", client.name, group);
                      }
                      else
                      {
                         write_client(client.sock, "Error : unknown command");
+                        printf("Client %s tried to use an unknown command\n", client.name);
                      }
                   }
                   else if(buffer[0] == '#') // "#group message" will send the message "message" to group named "group"
@@ -776,23 +788,25 @@ static void app(void)
                      if(!exists)
                      {
                         write_client(client.sock, "This group doesn't exist");
+                        printf("Client %s tried to send a message to a non existing group\n", client.name);
                         continue;
                      }
                      if(!isMember)
                      {
                         write_client(client.sock, "You do not belong to this group, please join it first");
+                        printf("Client %s tried to send a message to a group he's not part of\n", client.name);
                         continue;
                      }
 
                      /* if the client belongs to the group, we want to send the message to the whole group */
                      send_message_to_group(groups[gpIndex], client, message, 0);
+                     printf("Client %s sent a message to the group %s\n", client.name, group);
                   }
                   else
                   {
                      send_message_to_all_clients(clients, client, actual, buffer, 0);
+                     printf("Client %s sent a message to all clients\n", client.name);
                   }
-                  // send_message_to_one_client(clients, client, actual, buffer, 1);
-                  // send_message_to_all_clients(clients, client, actual, buffer, 0);
                }
                break;
             }
