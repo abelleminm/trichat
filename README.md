@@ -42,7 +42,7 @@ Commandes relatives aux groupes :
   * rejoindre un groupe qui n'existe pas
   * afficher l'historique d'un groupe qui n'existe pas
   * afficher l'historique d'un groupe dont il ne fait pas partie
-   * quitter un groupe dont il ne fait pas partie
+  * quitter un groupe dont il ne fait pas partie
   * quitter un groupe qui n'existe pas
   * lister les membres d'un groupe dont il ne fait pas partie
   * lister les membres d'un groupe inexistant
