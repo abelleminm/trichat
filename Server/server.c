@@ -393,7 +393,8 @@ static void app(void)
                         /* we open the file in read only : if the file doesn't exist then the group doesn't exist */
                         char filename[BUF_SIZE];
                         filename[0] = 0;
-                        strncpy(filename, client.name, BUF_SIZE - 1);
+                        strncpy(filename, "Data/", BUF_SIZE - 1);
+                        strncat(filename, client.name, BUF_SIZE - 1);
                         strncat(filename, "_mailbox", sizeof filename - strlen(filename) - 1);
                         if((fptr = fopen(filename, "r")) == NULL) { 
                            perror("Error : mailbox doesn\'t exist\n");
@@ -859,7 +860,8 @@ static void add_to_mailbox(const char* message, Client dest, Client sender)
    /* we first open the file in append mode => build the name */
    char filename[BUF_SIZE];
    filename[0] = 0;
-   strncpy(filename, dest.name, BUF_SIZE - 1);
+   strncpy(filename, "Data/", BUF_SIZE - 1);
+   strncat(filename, dest.name, BUF_SIZE - 1);
    strncat(filename, "_mailbox", sizeof filename - strlen(filename) - 1);
    FILE* fptr;
    /* then we open it in append mode to add the message */
