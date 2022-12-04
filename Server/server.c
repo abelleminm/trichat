@@ -388,10 +388,11 @@ static void app(void)
                         remove_client(clients, i, &actual);
                         printf("Client %s disconnected successfully\n", clients[i].name);
                         continue;
-                     }else if(!strcmp(command, "mailbox"))
+                     }
+                     else if(!strcmp(command, "mailbox"))
                      {
                         FILE* fptr;
-                        /* we open the file in read only : if the file doesn't exist then the group doesn't exist */
+                        /* we open the file in read only : if the file doesn't exist then the mailbox doesn't exist */
                         char filename[BUF_SIZE];
                         filename[0] = 0;
                         strncpy(filename, "Data/", BUF_SIZE - 1);
@@ -425,11 +426,10 @@ static void app(void)
 
                         /* we then go back to the begining of the file */
                         fseek(fptr, 0, SEEK_SET);
-                        /* and we read and send the 10 last lines */
+                        /* and we read and send the messages in the mailbox */
                         write_client(client.sock, "========== Mailbox ===========");
                         line = NULL;
                         len = 0;
-                        int counter = 0;
                         /* we read all the lines */
                         while((nread = getline(&line, &len, fptr)) != -1) {
                            write_client(client.sock, line);
@@ -440,8 +440,41 @@ static void app(void)
 
                         /* don't forget to close the file */
                         fclose(fptr);
-                        fclose(fopen(filename, "w"));
+                        //fclose(fopen(filename, "w"));
                         printf("Client %s read his mailbox, it was then cleaned\n", client.name);
+                        continue;
+                     }
+                     else if(!strcmp(command, "mygroups")) // command to list all the groups the user belongs to
+                     {
+                        int nogroups = 1;
+                        write_client(client.sock, "========= Your groups =========\n");
+                        for(int i = 0; i<nbrGroup; ++i)
+                        {
+                           for(int j = 0; j<groups[i]->actual; ++j)
+                           {
+                              if(!strcmp(client.name, groups[i]->members[j]->name)) // if we find the user's name in the members list
+                              {
+                                 nogroups = 0;
+                                 write_client(client.sock, groups[i]->name);
+                                 break;
+                              }
+                           }
+                        }
+                        if(nogroups) 
+                        {
+                           write_client(client.sock, "You do not belong to any group, try joining some !");
+                        }
+                        write_client(client.sock, "===============================");
+                        continue;
+                     }
+                     else if(!strcmp(command, "groups")) // command to list all the existing groups
+                     {
+                        write_client(client.sock, "========= All groups =========\n");
+                        for(int i = 0; i<nbrGroup; ++i)
+                        {
+                           write_client(client.sock, groups[i]->name);
+                        }
+                        write_client(client.sock, "==============================");
                         continue;
                      }
 
