@@ -798,10 +798,13 @@ static int read_client(SOCKET sock, char *buffer)
 
 static void write_client(SOCKET sock, const char *buffer)
 {
-   if(send(sock, buffer, strlen(buffer), 0) < 0)
+   if(sock != NULL)
    {
-      perror("send()");
-      exit(errno);
+      if(send(sock, buffer, strlen(buffer), 0) < 0)
+      {
+         perror("send()");
+         exit(errno);
+      }
    }
 }
 
