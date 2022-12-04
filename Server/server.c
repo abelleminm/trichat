@@ -382,10 +382,7 @@ static void app(void)
                      {
                         closesocket(clients[i].sock);
                         remove_client(clients, i, &actual);
-                        strncpy(buffer, client.name, BUF_SIZE - 1);
-                        strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
-                        Client destinataire = clients[0];
-                        send_message_to_one_client(destinataire, client, actual, buffer, 1);
+                        printf("Client %s disconnected successfully\n", clients[i].name);
                         continue;
                      }else if(!strcmp(command, "mailbox"))
                      {
