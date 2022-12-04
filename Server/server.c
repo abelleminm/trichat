@@ -448,7 +448,7 @@ static void app(void)
                      else if(!strcmp(command, "mygroups")) // command to list all the groups the user belongs to
                      {
                         int nogroups = 1;
-                        write_client(client.sock, "========= Your groups =========\n");
+                        write_client(client.sock, "========= Your groups =========");
                         for(int i = 0; i<nbrGroup; ++i)
                         {
                            for(int j = 0; j<groups[i]->actual; ++j)
@@ -465,17 +465,17 @@ static void app(void)
                         {
                            write_client(client.sock, "You do not belong to any group, try joining some !");
                         }
-                        write_client(client.sock, "===============================");
+                        write_client(client.sock, "\n===============================");
                         continue;
                      }
                      else if(!strcmp(command, "groups")) // command to list all the existing groups
                      {
-                        write_client(client.sock, "========= All groups =========\n");
+                        write_client(client.sock, "========= All groups =========");
                         for(int i = 0; i<nbrGroup; ++i)
                         {
                            write_client(client.sock, groups[i]->name);
                         }
-                        write_client(client.sock, "==============================");
+                        write_client(client.sock, "\n==============================");
                         continue;
                      }
 
