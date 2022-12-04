@@ -45,11 +45,12 @@ static int read_client(SOCKET sock, char *buffer);
 static void write_client(SOCKET sock, const char *buffer);
 static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
 static void send_message_to_one_client(Client destinataire, Client sender, int actual, const char *buffer, char from_server);
-static void send_message_to_group(Group* group, Client sender, const char* message, char from_server);
+static void send_message_to_group(Group* group, Client sender, const char* message, int from_server);
 static void add_to_group_history(const char* message, Group* group);
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
 static Client get_client_by_name(Client *clients, const char *name, int actual);
 static int add_client_group(Client* client, Group** groups, int nbrGroup, const char *group);
+static int leave_group(Client* client, Group** groups, int nbrGroup, const char *group);
 
 #endif /* guard */
