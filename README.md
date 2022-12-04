@@ -25,9 +25,9 @@ Ecrire directement depuis son terminal envoie un message à toutes les personnes
 - Pour l'envoie de messages privés : l'utilisateur est prévenu si 
   * il essaye d'envoyer un message a un utilisateur qui n'existe pas
   * le destinataire existe mais n'est pas connecté (et ne recevra donc pas le message)
-- Pour l'envoie de messages à un groupe : l'utilisateur est notifié si 
-  * il essaye d'envoyer un message à un groupe qui n'existe pas 
-  * il essaye d'envoyer un message à un groupe dont il ne fait pas partie
+- Pour l'envoie de messages à un groupe : l'utilisateur est notifié si il essaye d'envoyer un message à un groupe
+  * qui n'existe pas 
+  * dont il ne fait pas partie
 - Pour les commandes relatives aux groupes : l'utilisateur est notifié si il essaye de 
   * créer un groupe qui existe déjà
   * rejoindre un groupe dont il fait déjà partie
