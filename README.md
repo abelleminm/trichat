@@ -24,7 +24,7 @@ Ecrire directement depuis son terminal envoie un message à toutes les personnes
 ## Traitement des cas limites :
 - Pour l'envoie de messages privés : l'utilisateur est prévenu si 
   * il essaye d'envoyer un message a un utilisateur qui n'existe pas
-  * l'utilisateur existe mais n'est pas connecté (et ne recevra donc pas le message)
+  * le destinataire existe mais n'est pas connecté (et ne recevra donc pas le message)
 - Pour l'envoie de messages à un groupe : l'utilisateur est notifié si 
   * il essaye d'envoyer un message à un groupe qui n'existe pas 
   * il essaye d'envoyer un message à un groupe dont il ne fait pas partie
