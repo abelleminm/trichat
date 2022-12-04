@@ -52,6 +52,6 @@ static void clear_clients(Client *clients, int actual);
 static Client get_client_by_name(Client *clients, const char *name, int actual);
 static int add_client_group(Client* client, Group** groups, int nbrGroup, const char *group);
 static void init_groups(Client* clients, int nbCli, Group*** groups, int* nbGp);
-static void add_to_mailbox(const char* message, Client dest);
+static void add_to_mailbox(const char* message, Client dest, Client sender);
 
 #endif /* guard */

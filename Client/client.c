@@ -67,11 +67,11 @@ static void app(const char *address, const char *name)
                /* fclean */
                buffer[BUF_SIZE - 1] = 0;
             }
-            
+
             // if client writes quit then disconnect and exit
             if (strcmp(buffer, "!quit") == 0)
             {
-               write_server(sock, buffer);
+               write_server(sock, 0);
                printf("Goodbye!\n");
                end_connection(sock);
                return;
