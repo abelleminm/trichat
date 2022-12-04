@@ -764,6 +764,46 @@ static void app(void)
                         fclose(fptr);
                         printf("Client %s viewed the history of the group %s\n", client.name, group);
                      }
+                     else if(!strcmp(command, "members"))
+                     {
+                        int error = 1;
+                        /* Search the right group */
+                        for(int i = 0 ; i < nbrGroup ; ++i)
+                        {
+                           if(!strcmp(groups[i]->name, group))
+                           {
+                              /* Search if the client is part of the group */
+                              for(int j = 0 ; j < groups[i]->actual ; ++j)
+                              {
+                                 if(!strcmp(client.name, groups[i]->members[j]->name))
+                                 {
+                                    error = 0;
+                                    break;
+                                 }
+                              }
+                              if(error)
+                              {
+                                 write_client(client.sock, "You must be a member of the group to list its members");
+                                 error = 0; // to disable the second error below
+                                 break;
+                              } else {
+                                 write_client(client.sock, "===== Members of the group : =====\n");
+                                 for(int j = 0 ; j < groups[i]->actual ; ++j)
+                                 {
+                                    write_client(client.sock, groups[i]->members[j]->name);
+                                    write_client(client.sock, "\n");
+                                 }
+                                 write_client(client.sock, "===============");
+
+                              }
+                              break;
+                           }
+                        }
+                        if(error)
+                        {
+                           write_client(client.sock, "This group doesn't exist");
+                        }
+                     }
                      else
                      {
                         write_client(client.sock, "Error : unknown command");

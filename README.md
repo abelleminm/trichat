@@ -28,6 +28,7 @@ Commandes relatives aux groupes :
 - !join nomDuGroupe : permet à un utilisateur de rejoindre le groupe "nomDuGroupe"
 - !histo nomDuGroupe : liste les 10 derniers messages du groupe "nomDuGroupe"
 - !leave nomDuGroupe : permet à l'utilisateur de quitter le groupe "nomDuGroupe"
+- !members nomDuGroupe : permet à l'utilisateur de lister les membres du groupe "nomDuGroupe". Il doit faire parti du groupe pour réaliser cette action
 
 ## Traitement des cas limites :
 - Pour l'envoie de messages privés : l'utilisateur est prévenu si 
@@ -42,3 +43,7 @@ Commandes relatives aux groupes :
   * rejoindre un groupe qui n'existe pas
   * afficher l'historique d'un groupe qui n'existe pas
   * afficher l'historique d'un groupe dont il ne fait pas partie
+  * quitter un groupe dont il ne fait pas partie
+  * quitter un groupe qui n'existe pas
+  * lister les membres d'un groupe dont il ne fait pas partie
+  * lister les membres d'un groupe inexistant
