@@ -324,12 +324,30 @@ static void app(void)
                   {
                      char *name = buffer + 1;
                      char *message = strchr(buffer, ' ');
-                     if(message == NULL)
+                     if(name == NULL)
                      {
+                        write_client(client.sock, "usage : @name [message]");
                         continue;
                      }
+
+                     /* error handling : if the user types "@name " we need to print and error message */
+                     if(message == NULL) // if the ' ' wasn't found strchr will return a NULL pointer
+                     {
+                        write_client(client.sock, "usage : @name [message]");
+                        continue;
+                     }
+
+                     // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
                      *message = 0;
                      message++;
+
+                     /* error handling : if the user types "@name " we need to print and error message */
+                     if(strlen(message) == 0) // if after splitting the buffer, there is nothing
+                     {
+                        write_client(client.sock, "usage : @name [message]");
+                        continue;
+                     }
+                     
                      Client destinataire = get_client_by_name(clients, name, actual);
                      if(destinataire.sock == -1) // get_client_by_name returns a client with sock = -1 if the client doesn't exist
                      {
@@ -352,11 +370,28 @@ static void app(void)
                      char *group = strchr(buffer, ' ');
                      if(command == NULL)
                      {
+                        write_client(client.sock, "usage : !command [group]");
                         continue;
                      }
+
+                     /* error handling : if the user types "!command" we need to print and error message */
+                     if(group == NULL) // if the ' ' wasn't found strchr will return a NULL pointer
+                     {
+                        write_client(client.sock, "usage : !command [group]");
+                        continue;
+                     }
+
                      // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
                      *group = 0; 
                      group++;
+
+                     /* error handling : if the user types "!command " we need to print and error message */
+                     if(strlen(group) == 0) // if after splitting the buffer, there is nothing
+                     {
+                        write_client(client.sock, "usage : !command [group]");
+                        continue;
+                     }
+
                      if(!strcmp(command, "create")) // user wants to create a group chat
                      {
                         /* first we need to check if the conversation doesn't already exist */
@@ -578,11 +613,27 @@ static void app(void)
                      char *message = strchr(buffer, ' ');
                      if(group == NULL)
                      {
+                        write_client(client.sock, "usage : #group [message]");
                         continue;
                      }
-                     // we split the buffer in two by putting a null byte to terminate the group buffer in place of the ' ' at the begining of the message
-                     *message = 0; 
+
+                     /* error handling : if the user types "#group" we need to print and error message */
+                     if(message == NULL) // if the ' ' wasn't found strchr will return a NULL pointer
+                     {
+                        write_client(client.sock, "usage : #group [message]");
+                        continue;
+                     }
+
+                     // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
+                     *message = 0;
                      message++;
+
+                     /* error handling : if the user types "#group " we need to print and error message */
+                     if(strlen(message) == 0) // if after splitting the buffer, there is nothing
+                     {
+                        write_client(client.sock, "usage : #group [message]");
+                        continue;
+                     }
 
                      int exists = 0;
                      int isMember = 0;
