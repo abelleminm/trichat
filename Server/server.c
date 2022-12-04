@@ -374,6 +374,19 @@ static void app(void)
                         continue;
                      }
 
+                     /* if the user calls the quit command we just disconnect him */
+                     if(!strcmp(command, "quit"))
+                     {
+                        closesocket(clients[i].sock);
+                        remove_client(clients, i, &actual);
+                        strncpy(buffer, client.name, BUF_SIZE - 1);
+                        strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
+                        Client destinataire = clients[0];
+                        send_message_to_one_client(destinataire, client, actual, buffer, 1);
+                        continue;
+                     }
+
+                     /* if we are in the case where the command is not quit => then we need to have a group name after the command */
                      /* error handling : if the user types "!command" we need to print and error message */
                      if(group == NULL) // if the ' ' wasn't found strchr will return a NULL pointer
                      {
@@ -698,10 +711,7 @@ static void clear_clients(Client *clients, int actual)
 
 static void remove_client(Client *clients, int to_remove, int *actual)
 {
-   /* we remove the client in the array */
-   memmove(clients + to_remove, clients + to_remove + 1, (*actual - to_remove - 1) * sizeof(Client));
-   /* number client - 1 */
-   (*actual)--;
+   clients[to_remove].sock = NULL;
 }
 
 static void send_message_to_group(Group* group, Client sender, const char* message, char from_server)
