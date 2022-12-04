@@ -183,12 +183,6 @@ static void app(void)
                {
                   closesocket(clients[i].sock);
                   remove_client(clients, i, &actual);
-                  strncpy(buffer, client.name, BUF_SIZE - 1);
-                  strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
-                  Client destinataire = clients[0];
-                  send_message_to_one_client(destinataire, client, actual, buffer, 1);
-                  printf ("Client : %s sent a message to client : %s.\n", client.name, destinataire.name);
-                  //send_message_to_all_clients(clients, client, actual, buffer, 1);
                }
                else
                {
@@ -204,10 +198,21 @@ static void app(void)
                      *message = 0;
                      message++;
                      Client destinataire = get_client_by_name(clients, name, actual);
+
+                     // check if the client is connected (sock open or close?)
+                     int connected = 0;
+                     char buff[BUF_SIZE];
+                     bzero(buff, BUF_SIZE);
+                     int n = read(destinataire.sock, buff, BUF_SIZE - 1);
+                     printf("Lecture du sock de destinataire : %d\n", n);
                      if(destinataire.sock != -1)
                      {
                         send_message_to_one_client(destinataire, client, actual, message, 0);
                         printf ("Client : %s sent a message to client : %s.\n", client.name, destinataire.name);
+                     }else if (destinataire.sock == -1){
+                        write_client(client.sock, "This user is not connected.");
+                     }else{
+                        write_client(client.sock, "This user doesn't exist.");
                      }
                   }
                   else if(buffer[0] == '!') // the user sends "!command" to execute command "command" => for groups
@@ -218,11 +223,20 @@ static void app(void)
                      {
                         continue;
                      }
-                     // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
-                     *group = 0; 
-                     group++;
+                     if(group != NULL)
+                     {
+                        // we split the buffer in two by putting a null byte to terminate the command buffer in place of the ' ' at the begining of the group name
+                        *group = 0; 
+                        group++;
+                     }
+                     
                      if(!strcmp(command, "create")) // user wants to create a group chat
                      {
+                        if(group == NULL)
+                        {
+                           write_client(client.sock, "Usage : !create [group_name]");
+                           continue;
+                        }
                         /* first we need to check if the conversation doesn't already exist */
                         FILE* fptr;
                         /* we open the file in read only => if it doesn't exist, it will return NULL */
@@ -261,9 +275,20 @@ static void app(void)
                      }
                      else if(!strcmp(command, "join")) // user wants to join a group chat
                      {
+                        if(group == NULL)
+                        {
+                           write_client(client.sock, "Usage : !join [group_name]");
+                           continue;
+                        }
                         add_client_group(client, groups, nbrGroup, group);
                         /* send a message to all clients in the group to let them know someone joined */
                         send_message_to_group(clients,client,actual,group,NULL,1);
+                     }
+                     else if(!strcmp(command, "quit"))
+                     {
+                        closesocket(client.sock);
+                        remove_client(clients, i, &actual);
+                        printf("Client %s disconnected\n", client.name);
                      }
                      else
                      {
