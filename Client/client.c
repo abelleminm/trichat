@@ -69,13 +69,13 @@ static void app(const char *address, const char *name)
             }
 
             // if client writes quit then disconnect and exit
-            if (strcmp(buffer, "!quit") == 0)
-            {
-               write_server(sock, 0);
-               printf("Goodbye!\n");
-               end_connection(sock);
-               return;
-            }
+            // if (strcmp(buffer, "!quit") == 0)
+            // {
+            //    write_server(sock, 0);
+            //    printf("Goodbye!\n");
+            //    // end_connection(sock);
+            //    return;
+            // }
          }
          write_server(sock, buffer);
       }

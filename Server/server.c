@@ -387,6 +387,59 @@ static void app(void)
                         Client destinataire = clients[0];
                         send_message_to_one_client(destinataire, client, actual, buffer, 1);
                         continue;
+                     }else if(!strcmp(command, "mailbox"))
+                     {
+                        FILE* fptr;
+                        /* we open the file in read only : if the file doesn't exist then the group doesn't exist */
+                        char filename[BUF_SIZE];
+                        filename[0] = 0;
+                        strncpy(filename, client.name, BUF_SIZE - 1);
+                        strncat(filename, "_mailbox", sizeof filename - strlen(filename) - 1);
+                        if((fptr = fopen(filename, "r")) == NULL) { 
+                           perror("Error : mailbox doesn\'t exist\n");
+                           write_client(client.sock, "Your mailbox is empty");
+                           continue;
+                           /* no need to close the file because if we get to this point it means it wasn't opened */
+                        }
+                        /* go to the start of the file just to be sure */
+                        fseek(fptr, 0, SEEK_SET);
+
+                        char* line = NULL;
+                        size_t len = 0;
+                        ssize_t nread;
+                        int countLine = 0;
+                        /* we count the number of lines */
+                        while((nread = getline(&line, &len, fptr)) != -1) {
+                           ++countLine;
+                        }
+                        /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
+                        free(line);
+                        
+                        // if the file is empty
+                        if(countLine==0){
+                           write_client(client.sock, "Your mailbox is empty");
+                           continue;
+                        }
+
+                        /* we then go back to the begining of the file */
+                        fseek(fptr, 0, SEEK_SET);
+                        /* and we read and send the 10 last lines */
+                        write_client(client.sock, "========== Mailbox ===========");
+                        line = NULL;
+                        len = 0;
+                        int counter = 0;
+                        /* we read all the lines */
+                        while((nread = getline(&line, &len, fptr)) != -1) {
+                           write_client(client.sock, line);
+                        }
+                        free(line);
+
+                        write_client(client.sock, "==============================");
+
+                        /* don't forget to close the file */
+                        fclose(fptr);
+                        fclose(fopen(filename, "w"));
+                        continue;
                      }
 
                      /* if we are in the case where the command is not quit => then we need to have a group name after the command */
@@ -634,65 +687,6 @@ static void app(void)
 
                         /* don't forget to close the file */
                         fclose(fptr);
-                     }
-                     else if(!strcmp(command, "quit"))
-                     {
-                        closesocket(client.sock);
-                        client.sock=NULL;
-                        printf("Client %s disconnected\n", client.name);
-                     }
-                     else if(!strcmp(command, "mailbox"))
-                     {
-                        FILE* fptr;
-                        /* we open the file in read only : if the file doesn't exist then the group doesn't exist */
-                        char filename[BUF_SIZE];
-                        filename[0] = 0;
-                        strncpy(filename, client.name, BUF_SIZE - 1);
-                        strncat(filename, "_mailbox", sizeof filename - strlen(filename) - 1);
-                        if((fptr = fopen(filename, "r")) == NULL) { 
-                           perror("Error : mailbox doesn\'t exist\n");
-                           write_client(client.sock, "Your mailbox is empty");
-                           continue;
-                           /* no need to close the file because if we get to this point it means it wasn't opened */
-                        }
-                        /* go to the start of the file just to be sure */
-                        fseek(fptr, 0, SEEK_SET);
-
-                        char* line = NULL;
-                        size_t len = 0;
-                        ssize_t nread;
-                        int countLine = 0;
-                        /* we count the number of lines */
-                        while((nread = getline(&line, &len, fptr)) != -1) {
-                           ++countLine;
-                        }
-                        /* we gave a NULL buffer and 0 size to getline so it allocated memory itself but we need to free this memory ourselves after */
-                        free(line);
-                        
-                        // if the file is empty
-                        if(countLine==0){
-                           write_client(client.sock, "Your mailbox is empty");
-                           continue;
-                        }
-
-                        /* we then go back to the begining of the file */
-                        fseek(fptr, 0, SEEK_SET);
-                        /* and we read and send the 10 last lines */
-                        write_client(client.sock, "======= Mailbox ======");
-                        line = NULL;
-                        len = 0;
-                        int counter = 0;
-                        /* we read all the lines */
-                        while((nread = getline(&line, &len, fptr)) != -1) {
-                           write_client(client.sock, line);
-                        }
-                        free(line);
-
-                        write_client(client.sock, "==============================");
-
-                        /* don't forget to close the file */
-                        fclose(fptr);
-                        fclose(fopen(filename, "w"));
                      }
                      else
                      {
